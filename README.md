@@ -1,0 +1,1 @@
+[training and testing convolutional network design](CNNdiagram_6.15.19.png)
