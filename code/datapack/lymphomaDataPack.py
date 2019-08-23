@@ -16,7 +16,7 @@ from six.moves import range
 from abc import abstractmethod, ABCMeta
 import threading
 
-from scipy.misc import imsave
+#from scipy.misc import imsave
 import pickle as pickle
 
 import random as rnd

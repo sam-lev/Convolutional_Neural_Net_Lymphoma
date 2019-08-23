@@ -58,7 +58,7 @@ python3 denseNet_Lymphoma.py --gpu 0,1 (--load model-xxx) --drop_1 100 --drop_2 
 """
 
 
-BATCH_SIZE = 3
+BATCH_SIZE = 30
 
 class Model(ModelDesc):
     def __init__(self, depth):
