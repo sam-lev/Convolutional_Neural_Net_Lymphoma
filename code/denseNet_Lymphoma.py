@@ -253,6 +253,7 @@ if __name__ == '__main__':
     parser.add_argument('--unknown_dir',type= str, default='../data/Unknowns/predictions/',help="unknown samples to classify")
     parser.add_argument('--save_sample',type= bool, default=False,help="boolean save originals")
     parser.add_argument('--original_dir',default=False,help="directory to save originals")
+    parser.add_argument('--num_gpu',type= int,help="Number GPU to use if not specificaly assigned")
     args = parser.parse_args()
 
     
@@ -273,15 +274,21 @@ if __name__ == '__main__':
 
     nr_tower = 1
     if args.gpu:
-        nr_tower = len(args.gpu.split(','))
-        config.nr_tower = nr_tower
+       if args.num_gpu:
+          nr_tower = ','.join(map(str,range(args.num_gpu)))
+       else:
+          nr_tower = len(args.gpu.split(','))
+       config.nr_tower = nr_tower
 
     if args.tot == 'train':
         num_gpu = max(get_num_gpu(),1) #len(args.gpu.split(','))#num_gpu#1#
         if get_num_gpu() == 1:
            launch_train_with_config(config, SimpleTrainer())
         else:
-           launch_train_with_config(config, SyncMultiGPUTrainer(num_gpu)) #SyncMultiGPUTrainerParameterServer
+           if args.num_gpu:
+              launch_train_with_config(config, SyncMultiGPUTrainer(args.num_gpu)) #SyncMultiGPUTrainerParameterServer
+           else:
+              launch_train_with_config(config, SyncMultiGPUTrainer(num_gpu)
     else:
         data = get_data('test', unknown_dir = args.unknown_dir, original_dir=args.original_dir)
         predictor = predictModel(config, data)
