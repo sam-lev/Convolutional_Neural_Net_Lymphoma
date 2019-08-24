@@ -58,7 +58,7 @@ python3 denseNet_Lymphoma.py --gpu 0,1 (--load model-xxx) --drop_1 100 --drop_2 
 """
 
 
-BATCH_SIZE = 3
+BATCH_SIZE = 2
 
 class Model(ModelDesc):
     def __init__(self, depth):
@@ -272,24 +272,24 @@ if __name__ == '__main__':
         # example args.load '/path/to/model/folder/model-xxxx'
         config.session_init = SaverRestore(args.load)
 
-    nr_tower = 1
-    if args.gpu:
-       if args.num_gpu:
-          nr_tower = ','.join(map(str,range(args.num_gpu)))
-       else:
-          nr_tower = len(args.gpu.split(','))
-       config.nr_tower = nr_tower
+   nr_tower = 1
+   if args.gpu:
+      if args.num_gpu:
+         nr_tower = ','.join(map(str,range(args.num_gpu)))
+      else:
+         nr_tower = len(args.gpu.split(','))
+      config.nr_tower = nr_tower
 
-    if args.tot == 'train':
-        num_gpu = max(get_num_gpu(),1) #len(args.gpu.split(','))#num_gpu#1#
-        if get_num_gpu() == 1:
-           launch_train_with_config(config, SimpleTrainer())
-        else:
-           if args.num_gpu:
-              launch_train_with_config(config, SyncMultiGPUTrainer(args.num_gpu)) #SyncMultiGPUTrainerParameterServer
-           else:
-              launch_train_with_config(config, SyncMultiGPUTrainer(num_gpu)
-    else:
+   if args.tot == 'train':
+      num_gpu = max(get_num_gpu(),1) #len(args.gpu.split(','))#num_gpu#1#
+      if get_num_gpu() == 1:
+         launch_train_with_config(config, SimpleTrainer())
+      else:
+         if args.num_gpu:
+            launch_train_with_config(config, SyncMultiGPUTrainer(args.num_gpu)) #SyncMultiGPUTrainerParameterServer
+         else:
+            launch_train_with_config(config, SyncMultiGPUTrainer(num_gpu)
+   else:
         data = get_data('test', unknown_dir = args.unknown_dir, original_dir=args.original_dir)
         predictor = predictModel(config, data)
         res, all_res = predictor.get_results()
