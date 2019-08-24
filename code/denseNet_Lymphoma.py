@@ -19,7 +19,7 @@ import datapack
 from tensorpack import *
 from tensorpack.tfutils.symbolic_functions import *
 from tensorpack.tfutils.summary import *
-#from tensorpack.utils.gpu import get_num_gpu
+from tensorpack.utils.gpu import get_num_gpu
 
 from PIL import Image
 
@@ -31,11 +31,11 @@ def get_available_gpus():
    local_device_protos = device_lib.list_local_devices()
    return [x.name for x in local_device_protos if x.device_type == 'GPU']
 
-hello = tf.constant('Hello, TensorFlow!')
-sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
-print(sess.run(hello))
-print(tf.test.is_gpu_available())
-print(get_available_gpus())
+#hello = tf.constant('Hello, TensorFlow!')
+#sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+#print(sess.run(hello))
+#print(tf.test.is_gpu_available())
+#print(get_available_gpus())
 
 
 
@@ -58,7 +58,7 @@ python3 denseNet_Lymphoma.py --gpu 0,1 (--load model-xxx) --drop_1 100 --drop_2 
 """
 
 
-BATCH_SIZE = 30
+BATCH_SIZE = 3
 
 class Model(ModelDesc):
     def __init__(self, depth):
@@ -255,10 +255,13 @@ if __name__ == '__main__':
     parser.add_argument('--original_dir',default=False,help="directory to save originals")
     args = parser.parse_args()
 
+    
     if args.gpu:
         note = "Slurm assigns on DGX"
-        #os.environ[“CUDA_DEVICE_ORDER”] = “PCI_BUS_ID”
-        #os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+        if get_num_gpu() == 1:
+           print("hard assigning gpu")
+           os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+           os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str,range(get_num_gpu())))#args.gpu
 
     if not args.tot:
         args.tot == 'train'
@@ -271,10 +274,14 @@ if __name__ == '__main__':
     nr_tower = 1
     if args.gpu:
         nr_tower = len(args.gpu.split(','))
+        config.nr_tower = nr_tower
 
     if args.tot == 'train':
-        num_gpu = len(args.gpu.split(','))#num_gpu#1#max(get_num_gpu(),1)
-        launch_train_with_config(config, SyncMultiGPUTrainer(num_gpu))
+        num_gpu = max(get_num_gpu(),1) #len(args.gpu.split(','))#num_gpu#1#
+        if get_num_gpu() == 1:
+           launch_train_with_config(config, SimpleTrainer())
+        else:
+           launch_train_with_config(config, SyncMultiGPUTrainer(num_gpu)) #SyncMultiGPUTrainerParameterServer
     else:
         data = get_data('test', unknown_dir = args.unknown_dir, original_dir=args.original_dir)
         predictor = predictModel(config, data)
