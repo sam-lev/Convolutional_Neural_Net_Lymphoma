@@ -288,49 +288,49 @@ if __name__ == '__main__':
          if args.num_gpu:
             launch_train_with_config(config, SyncMultiGPUTrainer(args.num_gpu)) #SyncMultiGPUTrainerParameterServer
          else:
-            launch_train_with_config(config, SyncMultiGPUTrainer(num_gpu)
+            launch_train_with_config(config, SyncMultiGPUTrainer(num_gpu))       
    else:
-        data = get_data('test', unknown_dir = args.unknown_dir, original_dir=args.original_dir)
-        predictor = predictModel(config, data)
-        res, all_res = predictor.get_results()
-        img_list = []
-        prediction = []
-        BL_count = 0
-        DLBCL_count = 0
-        tie = 0
-
-        for i, op in enumerate(res[0][4]):
-            prediction.append(res[0][1][i])
-            img_list.append(op)
-
-            path = '../data/Unknowns/predictions/'+args.out_dir+'_Predictions/'
-            im = Image.fromarray(np.asarray(op).astype('uint8'),'RGB')#.astype('uint8'))                                    
-            im.save('../data/Unknowns/predictions/'+args.out_dir+'_Predictions/'+str(i)+"_"+str(res[0\
+      data = get_data('test', unknown_dir = args.unknown_dir, original_dir=args.original_dir)
+      predictor = predictModel(config, data)
+      res, all_res = predictor.get_results()
+      img_list = []
+      prediction = []
+      BL_count = 0
+      DLBCL_count = 0
+      tie = 0
+      
+      for i, op in enumerate(res[0][4]):
+         prediction.append(res[0][1][i])
+         img_list.append(op)
+         
+         path = '../data/Unknowns/predictions/'+args.out_dir+'_Predictions/'
+         im = Image.fromarray(np.asarray(op).astype('uint8'),'RGB')#.astype('uint8'))                                    
+         im.save('../data/Unknowns/predictions/'+args.out_dir+'_Predictions/'+str(i)+"_"+str(res[0\
 ][1][i])+'.jpeg')
-            im.close()
-
-            path = path+'/predictions.txt'
-            if os.path.exists(path):
-               append_write = 'a'
+         im.close()
+         
+         path = path+'/predictions.txt'
+         if os.path.exists(path):
+            append_write = 'a'
             #write results to file                                                                                          
-            else:
-               append_write = 'w'
-            prediction_file = open(path, append_write)
-            prediction_file.write(str(res[0][1][i][0])+','+str(res[0][1][i][1])+"\n")
-            if res[0][1][i][0] > 0.5:
-               BL_count += 1
-            if res[0][1][i][1] > 0.5:
-               DLBCL_count += 1
-            if res[0][1][i][1] == 0.5:
-               tie += 1
-            prediction_file.close()
-        prediction_file = open(path, append_write)
-        if tie:
-           prediction_file.write(str(BL_count)+','+str(DLBCL_count)+str(tie)+"\n")
-        else:
+         else:
+            append_write = 'w'
+         prediction_file = open(path, append_write)
+         prediction_file.write(str(res[0][1][i][0])+','+str(res[0][1][i][1])+"\n")
+         if res[0][1][i][0] > 0.5:
+            BL_count += 1
+         if res[0][1][i][1] > 0.5:
+            DLBCL_count += 1
+         if res[0][1][i][1] == 0.5:
+            tie += 1
+         prediction_file.close()
+         prediction_file = open(path, append_write)
+         if tie:
+            prediction_file.write(str(BL_count)+','+str(DLBCL_count)+str(tie)+"\n")
+         else:
            prediction_file.write(str(BL_count)+','+str(DLBCL_count)+"\n")
-        prediction_file.close()
-        """for i, op in enumerate(res[0][4]):
+         prediction_file.close()
+         """for i, op in enumerate(res[0][4]):
             prediction.append(res[0][1][i])
             img_list.append(op)
 
