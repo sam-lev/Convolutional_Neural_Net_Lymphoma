@@ -241,37 +241,37 @@ class predictModel:
 
         
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.') # nargs='*' in multi mode
-    parser.add_argument('--load', help='load model')
-    parser.add_argument('--drop_1',default=80, help='Epoch to drop learning rate to 0.01.') # nargs='*' in multi mode
-    parser.add_argument('--drop_2',default=150,help='Epoch to drop learning rate to 0.001')
-    parser.add_argument('--depth',type=int, default=82, help='The depth of densenet')
-    parser.add_argument('--max_epoch',type= int, default=256,help='max epoch')
-    parser.add_argument('--tot',type= str, default='train',help=" 'train' or 'test'")
-    parser.add_argument('--out_dir',type= str, default='../data/Unknowns/predictions/',help="img out dir")
-    parser.add_argument('--unknown_dir',type= str, default='../data/Unknowns/predictions/',help="unknown samples to classify")
-    parser.add_argument('--save_sample',type= bool, default=False,help="boolean save originals")
-    parser.add_argument('--original_dir',default=False,help="directory to save originals")
-    parser.add_argument('--num_gpu',type= int,help="Number GPU to use if not specificaly assigned")
-    args = parser.parse_args()
-
-    
-    if args.gpu:
-        note = "Slurm assigns on DGX"
-        if get_num_gpu() == 1:
-           print("hard assigning gpu")
-           os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-           os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str,range(get_num_gpu())))#args.gpu
-
-    if not args.tot:
-        args.tot == 'train'
+   parser = argparse.ArgumentParser()
+   parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.') # nargs='*' in multi mode
+   parser.add_argument('--load', help='load model')
+   parser.add_argument('--drop_1',default=80, help='Epoch to drop learning rate to 0.01.') # nargs='*' in multi mode
+   parser.add_argument('--drop_2',default=150,help='Epoch to drop learning rate to 0.001')
+   parser.add_argument('--depth',type=int, default=82, help='The depth of densenet')
+   parser.add_argument('--max_epoch',type= int, default=256,help='max epoch')
+   parser.add_argument('--tot',type= str, default='train',help=" 'train' or 'test'")
+   parser.add_argument('--out_dir',type= str, default='../data/Unknowns/predictions/',help="img out dir")
+   parser.add_argument('--unknown_dir',type= str, default='../data/Unknowns/predictions/',help="unknown samples to classify")
+   parser.add_argument('--save_sample',type= bool, default=False,help="boolean save originals")
+   parser.add_argument('--original_dir',default=False,help="directory to save originals")
+   parser.add_argument('--num_gpu',type= int,help="Number GPU to use if not specificaly assigned")
+   args = parser.parse_args()
+   
+   
+   if args.gpu:
+      note = "Slurm assigns on DGX"
+      if get_num_gpu() == 1:
+         print("hard assigning gpu")
+         os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+         os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str,range(get_num_gpu())))#args.gpu
+         
+   if not args.tot:
+      args.tot == 'train'
            
-    config = get_config(args.tot)
-    if args.load:
-        # example args.load '/path/to/model/folder/model-xxxx'
-        config.session_init = SaverRestore(args.load)
-
+   config = get_config(args.tot)
+   if args.load:
+      # example args.load '/path/to/model/folder/model-xxxx'
+      config.session_init = SaverRestore(args.load)
+      
    nr_tower = 1
    if args.gpu:
       if args.num_gpu:
