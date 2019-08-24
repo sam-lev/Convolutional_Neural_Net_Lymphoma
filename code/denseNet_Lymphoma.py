@@ -279,7 +279,7 @@ if __name__ == '__main__':
       else:
          nr_tower = len(args.gpu.split(','))
       config.nr_tower = nr_tower
-
+      
    if args.tot == 'train':
       num_gpu = max(get_num_gpu(),1) #len(args.gpu.split(','))#num_gpu#1#
       if get_num_gpu() == 1:
