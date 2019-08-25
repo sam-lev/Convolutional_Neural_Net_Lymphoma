@@ -1,10 +1,10 @@
 #!/home/sci/samlev/bin/bin/python3
 
 #SBATCH --time=21-00:00:00 # walltime, abbreviated by -t
-#SBATCH --mem=30G
+#SBATCH --mem=90G
 #SBATCH -o slurm-%j.out-%N # name of the stdout, using the job number (%j) and the first node (%N)        
 #SBATCH -e slurm-%j.err-%N # name of the stderr, using the job number (%j) and the first node (%N)
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:6
 
 import numpy as np
 import tensorflow as tf

@@ -1,10 +1,10 @@
 #!/home/sci/samlev/bin/bin/python3
 
 #SBATCH --time=21-00:00:00 # walltime, abbreviated by -t
-#SBATCH --mem=30G
+#SBATCH --mem=90G
 #SBATCH -o slurm-%j.out-%N # name of the stdout, using the job number (%j) and the first node (%N)
 #SBATCH -e slurm-%j.err-%N # name of the stderr, using the job number (%j) and the first node (%N)
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:6
 
 import numpy as np
 import tensorflow as tf
@@ -54,7 +54,7 @@ On one TITAN X GPU (CUDA 7.5 and cudnn 5.1), the code should run ~5iters/s on a 
  }
 
 Call Example:  
-python3 denseNet_Lymphoma.py --gpu 0,1 (--load model-xxx) --drop_1 100 --drop_2 200 --depth 40 --max_epoch 368 --tot train
+python3 denseNet_Lymphoma.py --gpu 0,1 (--num_gpu 4) (--load model-xxx) --drop_1 100 --drop_2 200 --depth 40 --max_epoch 368 --tot train
 """
 
 
@@ -182,7 +182,7 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
     
 def get_config(train_or_test):
     isTrain = train_or_test == 'train'
-    log_dir = 'train_log/HALF_TRAINING_dense_net_lymphoma2-single-first%s-second%s-max%s' % (str(args.drop_1), str(args.drop_2), str(args.max_epoch))
+    log_dir = 'train_log/'+args.model_name+'-first%s-second%s-max%s' % (str(args.drop_1), str(args.drop_2), str(args.max_epoch))
     logger.set_logger_dir(log_dir, action='n')
 
     # prepare dataset
@@ -242,6 +242,7 @@ class predictModel:
         
 if __name__ == '__main__':
    parser = argparse.ArgumentParser()
+   parser.add_argument('--model_name',type= str, default='MODEL',help="Name to prepend on model during training")
    parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.') # nargs='*' in multi mode
    parser.add_argument('--load', help='load model')
    parser.add_argument('--drop_1',default=80, help='Epoch to drop learning rate to 0.01.') # nargs='*' in multi mode
@@ -257,25 +258,26 @@ if __name__ == '__main__':
    args = parser.parse_args()
    
    
-   if args.gpu:
+   if args.gpu or get_num_gpu() == 1:
       note = "Slurm assigns on DGX"
-      if get_num_gpu() == 1:
-         print("hard assigning gpu")
-         os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-         os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str,range(get_num_gpu())))#args.gpu
+      print(" >>>> hard assigning gpu")
+      os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+      os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str,range(get_num_gpu())))#args.gpu
          
    if not args.tot:
       args.tot == 'train'
            
    config = get_config(args.tot)
    if args.load:
+      print(">>>> Loading model.")
       # example args.load '/path/to/model/folder/model-xxxx'
       config.session_init = SaverRestore(args.load)
       
    nr_tower = 1
-   if args.gpu:
+   if args.gpu or args.num_gpu:
       if args.num_gpu:
-         nr_tower = ','.join(map(str,range(args.num_gpu)))
+         print(">>>> Using "+str(args.num_gpu)+ " available GPU.")
+         nr_tower = args.num_gpu
       else:
          nr_tower = len(args.gpu.split(','))
       config.nr_tower = nr_tower
@@ -286,9 +288,11 @@ if __name__ == '__main__':
          launch_train_with_config(config, SimpleTrainer())
       else:
          if args.num_gpu:
+            print(">>>> Using "+str(args.num_gpu)+" available GPU.")
             launch_train_with_config(config, SyncMultiGPUTrainer(args.num_gpu)) #SyncMultiGPUTrainerParameterServer
          else:
-            launch_train_with_config(config, SyncMultiGPUTrainer(num_gpu))       
+            print(">>>> Using all GPU.")
+            launch_train_with_config(config, SyncMultiGPUTrainer(num_gpu))     
    else:
       data = get_data('test', unknown_dir = args.unknown_dir, original_dir=args.original_dir)
       predictor = predictModel(config, data)
