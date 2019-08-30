@@ -2,9 +2,9 @@
 
 #SBATCH --time=21-00:00:00 # walltime, abbreviated by -t
 #SBATCH --mem=120G
-#SBATCH -o slurm-%j.out-%N # name of the stdout, using the job number (%j) and the first node (%N)
-#SBATCH -e slurm-%j.err-%N # name of the stderr, using the job number (%j) and the first node (%N)
-#SBATCH --gres=gpu:2
+#SBATCH -o sshallow-%j.out-%N # name of the stdout, using the job number (%j) and the first node (%N)
+#SBATCH -e sshallow-%j.err-%N # name of the stderr, using the job number (%j) and the first node (%N)
+#SBATCH --gres=gpu:3
 
 import numpy as np
 import tensorflow as tf
@@ -63,7 +63,7 @@ class Model(ModelDesc):
     def __init__(self, depth):
         super(Model, self).__init__()
         self.N = int((depth - 4)  / 3)
-        self.growthRate = 12 
+        self.growthRate = 32
 
     def _get_inputs(self):
         return [InputDesc(tf.float32, [None, 224, 224, 3], 'input'),
@@ -75,9 +75,9 @@ class Model(ModelDesc):
         image = image / 128.0 - 1
         
         def conv(name, l, channel, stride):
-            return Conv2D(name, l, channel, 3, stride=stride,
+            return Conv2D(name, l, channel, 6, stride=stride,
                           nl=tf.identity, use_bias=False,
-                          W_init=tf.random_normal_initializer(stddev=np.sqrt(2.0/9/channel)))
+                          W_init = tf.contrib.layers.variance_scaling_initializer(factor=2.0, mode='FAN_AVG', uniform=False)) #factor=np.sqrt(2.0/(6+channel)), mode='FAN_IN', uniform=False, seed=None, dtype=tf.float32))   #tf.random_normal_initializer(stddev=np.sqrt(2.0/3/channel)))
         def add_layer(name, l):
             shape = l.get_shape().as_list()
             in_channel = shape[3]
@@ -100,7 +100,7 @@ class Model(ModelDesc):
 
 
         def dense_net(name):
-            l = conv('conv0',image,  16 , 1)
+            l = conv('conv0',image,  32 , 1)
             with tf.variable_scope('block1') as scope:
 
                 for i in range(self.N):
@@ -127,8 +127,10 @@ class Model(ModelDesc):
         logits = dense_net("dense_net") #map probabilities to real domain
 
         prob = tf.nn.softmax(logits, name='output')  #a generalization of the logistic function that "squashes" a K-dim vector z  of arbitrary real values to a K-dim vector sigma( z ) of real values in the range [0, 1] that add up to 1.
-
-        cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
+        factor = 730./(730+1576)
+        class_weights = tf.constant([1.0,1.0])#factor, 1.0-factor]) #dl 730 bl 1576
+        weights = tf.gather(class_weights, label)
+        cost = tf.losses.sparse_softmax_cross_entropy(label, logits, weights=weights) #False positive 3* False negatives so adjust weight by factor
         cost = tf.reduce_mean(cost, name='cross_entropy_loss') #normalize
 
         wrong = prediction_incorrect(logits, label)
@@ -148,7 +150,7 @@ class Model(ModelDesc):
     def _get_optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=0.1, trainable=False)
         tf.summary.scalar('learning_rate', lr)
-        return tf.train.MomentumOptimizer(lr, 0.9, use_nesterov=True)
+        return tf.train.AdamOptimizer(lr, beta1=0.9, beta2=0.999,epsilon=1e-08)#MomentumOptimizer(lr, 0.9, use_nesterov=True)
 
 
 def get_data(train_or_test, unknown_dir = None, original_dir=None):
@@ -156,15 +158,15 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
     ds =  datapack.lymphoma2(train_or_test, dir = '../data', unknown_dir = unknown_dir,original_dir=original_dir)
     #pp_mean = ds.get_per_pixel_mean()
     if isTrain:
-        augmentors = [
-            #and dividing by the standard deviation
-            imgaug.CenterPaste((224, 224)),# ((910,910)), #
-            #imgaug.RandomCrop((224, 224)), # ((900,900)), #
-            imgaug.Flip(horiz=True),
-            #imgaug.Brightness(20),
-            #imgaug.Contrast((0.6,1.4)),
-            #imgaug.MapImage(lambda x: x - pp_mean),
-        ]
+       augmentors = [
+          #and dividing by the standard deviation
+          imgaug.CenterPaste((224, 224)),
+          imgaug.Flip(horiz=True),
+          ##ZoomAug(zoom=10,seed=None),
+       ]
+       if np.random.random_sample() < 0.9:
+          augmentors.append(datapack.NormStainAug())
+          augmentors.append(datapack.HematoEAug(low=0.7, high=1.3, seed=None))
     else:
         augmentors = [
             #imgaug.MapImage(lambda x: x - pp_mean),
@@ -174,6 +176,8 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
         ]
 
     ds = AugmentImageComponent(ds, augmentors)
+
+    print(">>>>>>> Data Set Size: ", ds.size())
     
     batch_size = None
     
@@ -275,7 +279,7 @@ if __name__ == '__main__':
    parser.add_argument('--original_dir',default=False,help="directory to save originals")
    parser.add_argument('--num_gpu',type= int,help="Number GPU to use if not specificaly assigned")
    parser.add_argument('--gpu_frac',type= float,default=0.99,help="Number GPU to use if not specificaly assigned")
-   parser.add_argument('--mp',default=True,help="Whether or not to use multi=process parallel threading over or on GPU. 0 for no, 1 for yes. default yes.")
+   parser.add_argument('--mp',default=True,help="Whether or not to use parallel multiprocessing over or on GPU. 0 no, 1 yes. Default yes.")
    args = parser.parse_args()
    
    BATCH_SIZE = args.batch_size
