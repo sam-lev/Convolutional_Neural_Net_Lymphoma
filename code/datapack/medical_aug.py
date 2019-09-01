@@ -189,7 +189,7 @@ class hematoxylin_eosin_aug(imgaug.transform.ImageTransform):
         Io = 240
         
         h, w, c = img.shape
-        OD = -np.log10((img + 1) / Io).astype("uint16")
+        OD = -np.log10((img.astype("uint16") + 1.) / Io)#.astype("uint16")
         C = np.dot(D, OD.reshape(h * w, c).T).T
         r = np.ones(3)
         r[:2] = np.random.RandomState(seed).uniform(low=low, high=high, size=2)
@@ -202,7 +202,7 @@ class hematoxylin_eosin_aug(imgaug.transform.ImageTransform):
     
     def apply_coords(self, coords):
         return coords
-    
+
 class zoom_transform(imgaug.transform.ImageTransform):
     def __init__(self, zoom, seed = None):
         super(zoom_transform, self).__init__()
