@@ -2,8 +2,8 @@
 
 #SBATCH --time=21-00:00:00 # walltime, abbreviated by -t
 #SBATCH --mem=120G
-#SBATCH -o sshallow-%j.out-%N # name of the stdout, using the job number (%j) and the first node (%N)
-#SBATCH -e sshallow-%j.err-%N # name of the stderr, using the job number (%j) and the first node (%N)
+#SBATCH -o model_shallow.out-%j # name of the stdout, using the job number (%j) and the first node (%N)
+#SBATCH -e model_shallow.err-%j # name of the stderr, using the job number (%j) and the first node (%N)
 #SBATCH --gres=gpu:3
 
 import numpy as np
@@ -38,25 +38,20 @@ Code similar to Yuxin Wu's ResNet implementation: https://github.com/ppwwyyxx/te
 See also: https://github.com/YixuanLi/densenet-tensorflow/blob/7793c03a9c9dc009e4151aa4b7a74f0e62583973/cifar10-densenet.py
 Dataflow formated similar to cifar10 http://tensorpack.readthedocs.io/en/latest/_modules/tensorpack/dataflow/dataset/cifar.html 
 On one TITAN X GPU (CUDA 7.5 and cudnn 5.1), the code should run ~5iters/s on a batch size 64.
-
  @article{Huang2016Densely,
  		author = {Huang, Gao and Liu, Zhuang and Weinberger, Kilian Q.},
  		title = {Densely Connected Convolutional Networks},
  		journal = {arXiv preprint arXiv:1608.06993},
  		year = {2016}
  }
-
 Call Example:  
 >> Train listing GPU to use and basic training param:
 python3 denseNet_Lymphoma.py --gpu 0,1 (--num_gpu 4) (--load model-xxx) --drop_1 100 --drop_2 200 --depth 40 --max_epoch 368 --tot train
-
 >> Train Using Desired number of GPU and loading model partially trained:
 python3 denseNet_Lymphoma.py --num_gpu 8 --tot train --model_name 8_gpu_d1_58_d2_98_phase_3 --lr_0 0.01 --drop_1 58 --lr_1 0.001 --drop_2 98 --lr_2 0.0001 --max_epoch 134 --gpu_frac 0.99 --batch_size 2 --load train_log/4_gpu_d1_60_d2_160_d3_220_max_256-first63-second113-max149/model-398208
-
 >> Predict Class of files in folder '../data/Unknon/' + unknown_dir 
 >> and write prediction to '../data/Unknown/'+unknown_dir+'/predictions/'
 python3 denseNet_Lymphoma.py --tot test --gpu 0,1 --batch_size 500 --model_name ep_134_unkown_A --load train_log/8_gpu_d1_58_d2_98_phase_3-first58-second98-max134/model-523136 --unknown_dir A
-
 """
 
 class Model(ModelDesc):
@@ -162,11 +157,10 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
           #and dividing by the standard deviation
           imgaug.CenterPaste((224, 224)),
           imgaug.Flip(horiz=True),
+          ##datapack.NormStainAug(),
+          datapack.HematoEAug(low=0.7, high=1.3, seed=None),
           ##ZoomAug(zoom=10,seed=None),
        ]
-       if np.random.random_sample() < 0.9:
-          augmentors.append(datapack.NormStainAug())
-          augmentors.append(datapack.HematoEAug(low=0.7, high=1.3, seed=None))
     else:
         augmentors = [
             #imgaug.MapImage(lambda x: x - pp_mean),
@@ -382,4 +376,3 @@ if __name__ == '__main__':
          classify_unknown(config, data, args)
       else:
          classify_unknown(config, data, args)
-            

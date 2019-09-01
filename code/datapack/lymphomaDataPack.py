@@ -34,6 +34,8 @@ from tensorpack.dataflow.base import RNGDataFlow
 from PIL import Image
 import cv2
 
+from .medical_aug import normalize_staining, hematoxylin_eosin_aug
+
 #sys.path.append(os.getcwd())
 prediction_dir = "/home/sci/samlev/convNet_Lymphoma_Classifier/data/Unknowns/predictions/"
 
@@ -81,44 +83,56 @@ def read_lymphoma(filenames,  train_or_test = 'train', original_dir=None):
         data = dic['data']
         label = dic['labels']
         fo.close()
-        for k in range(len(data)):
-            # resize to divisable format for convolutions
-            scaleSize = 224,224
-            if np.random.random_sample() < 0.9:
-                imSize = 672
+        for tile in range(2):
+            if tile == 1:
+                part = max(int(0.2*len(data)),1)
             else:
-                imSize = 224
-            if train_or_test == 'test':
-                imsize = 672
-            #randPos = rnd.choice([0, 50, 100, 200, 300])
-            #img = data[k][:, randPos:(randPos+imSize), randPos:(randPos+imSize)] #:32, :32] #size currently (927,1276,3)
-
-            if original_dir:
-                if not os.path.exists(original_dir):
-                    os.mkdirs(original_dir)
-                save_original(data[k][:,:, :], save_dir=original_dir, name=k)
+                part = len(data)
+            for k in range(part):
+                # resize to divisable format for convolutions
+                img = data[k]
+                cropsize = (np.max(np.array(img.shape)), np.max(np.array(img.shape)[np.array(img.shape) < np.max(np.array(img.shape))]), 3) 
+                scaleSize = 224,224
+                imSize = 672
+                if train_or_test == 'test':
+                    imsize = 672
+                #randPos = rnd.choice([0, 50, 100, 200, 300])
+                #img = data[k][:, randPos:(randPos+imSize), randPos:(randPos+imSize)] #:32, :32] #size currently (927,1276,3)
                 
-            quality_cropper = quality_random_crop(data[k][:,:, :], imSize)        
-            img = quality_cropper.random_crop_select()  
-            
-            # make rgb feasible
-            img = np.transpose(img, [1, 2, 0])
-            img_ref = img
-            # format required for DataFlow
-            img = Image.fromarray(img,'RGB')
-            img = img.resize(scaleSize, Image.ANTIALIAS)#thumbnail(scaleSize) #image.resize(THUMB_SIZE, Image.ANTIALIAS)
-            if num_show < 5:
-                img.show()
-                num_show=5
-            img = np.asarray(img).reshape((224,224,3))
+                if original_dir:
+                    if not os.path.exists(original_dir):
+                        os.mkdirs(original_dir)
+                    save_original(data[k][:,:, :], save_dir=original_dir, name=k)
+                
+                ##quality_cropper = quality_random_crop(data[k][:,:, :], imSize)    
+                ##img = quality_cropper.random_crop_select()  
+                
+                # make rgb feasible
+                img = np.transpose(img, [1, 2, 0])
+                
+                # format required for DataFlow
+                ##img = Image.fromarray(img,'RGB')
+                ##img = img.resize(scaleSize, Image.ANTIALIAS)#thumbnail(scaleSize) #image.resize(THUMB_SIZE, Image.ANTIALIAS)
+                if num_show < 5:
+                    img.show()
+                    num_show=5
+                
+                start_w = [0, 500][tile]
+                start_h = [0, 400][tile]
+                img = img[start_w:(start_w+imSize),start_h:(start_h+imSize),:]
 
-            #img = np.transpose(img, [1,2,0])
-            #test = Image.fromarray(img, 'RGB')
-            
-            #img.tofile(str(k)+'.raw')
-            #test.show()
-            #img = np.transpose(img, [1,2,0])
-            ret.append([img, label[k]])
+                img = hematoxylin_eosin_aug(low = 0.7, high = 1.3).apply_image(img)
+                #img = normalize_staining().apply_image(img)
+                
+                img = Image.fromarray(img,'RGB')                              
+                img = img.resize(scaleSize, Image.ANTIALIAS)
+                
+                img = np.asarray(img).reshape((224,224,3))
+                
+                #img.tofile(str(k)+'.raw')
+                #test.show()
+                #img = np.transpose(img, [1,2,0])
+                ret.append([img, label[k]])
 
     return ret
 
