@@ -121,7 +121,7 @@ def read_lymphoma(filenames,  train_or_test = 'train', original_dir=None):
                 start_h = [0, 400][tile]
                 img = img[start_w:(start_w+imSize),start_h:(start_h+imSize),:]
 
-                img = hematoxylin_eosin_aug(low = 0.7, high = 1.3).apply_image(img)
+                #img = hematoxylin_eosin_aug(low = 0.7, high = 1.3).apply_image(img)
                 #img = normalize_staining().apply_image(img)
                 
                 img = Image.fromarray(img,'RGB')                              
@@ -202,7 +202,15 @@ class lymphomaBase( RNGDataFlow ):
             self.rng.shuffle(image_data)
         for i in image_data:
             yield self.data[i]
-
+    
+    def __iter__(self):
+        idxs = np.arange(len(self.data))
+        if self.shuffle:
+            self.rng.shuffle(idxs)
+        for k in idxs:
+            # since cifar is quite small, just do it for safety
+            yield self.data[k]
+    
     def get_per_pixel_mean(self):
         """
         return a mean image of all (train and test) images of size 927x1276
