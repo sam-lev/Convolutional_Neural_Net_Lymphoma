@@ -23,7 +23,9 @@ def FP_rate(fp, tn):
 # False Positive: Truly BL but predicts DLBCL
 # True Positive: Truly DLBCL predicted DLBCL
 
-print(len(DL_files)+len(BL_files))
+print("Total Files DL: ", len(DL_files))
+print("Total Files BL: ", len(BL_files))
+
 FP = []
 TP = []
 TN = []
@@ -133,21 +135,34 @@ for i in range(len(fp_rate)):
     fp_rate[i] = fp_r
     tp_rate[i] = tp_r
 
+def ci_95(FP, FN, TP, TN, z=1.96):
+    z_a = z
+    error = (FP + FN) / float(TP + TN + FP + FN)
+    print("Error: ", error)
+    std_err = np.sqrt((float(error)*(1.0-error))/float(TP+FN))
+    return z_a*std_err
+print("")
+print("------------------------------------------------------------")
+print("| True Negative (TN): ", len(TN), "  |  ","False Positive (FP): ", len(FP),"|")
+print("-----------------------------------------------------------")
+print("| False Negative (FN): ", len(FN),"  |  ","True Positive (TP): ", len(TP)," |")
+print("------------------------------------------------------------")
+print("")
 print("----------")
-print("FP: ", len(FP))
-print("TP: ", len(TP))
-print("TN: ", len(TN))
-print("FN: ", len(FN))
-print("----------")
-print(np.max(F1_thresh))
-print("F1 score: ", F1(precision(len(TP),len(FP)), recall(len(TP),len(FN))))
+print("Total DLBCL: ", len(TP)+len(FN))
+print("Total BL: ", len(FP) + len(TN))
 print("Total Images: ",len(FN)+len(FP)+len(TP)+len(TN))
-
-print(DL_files,BL_files)
+print("----------")
+print("")
+print("----------")
+print("Max F1: ",np.max(F1_thresh))
+print("F1 score (+/- CI_95): ", F1(precision(len(TP),len(FP)), recall(len(TP),len(FN)))," +/- ",  ci_95(len(FP),len(FN),len(TP),len(TN)))
+print("----------")
+#print(DL_files,BL_files)
 
 #print(F1(precision(592.,147.),recall(592., 139.)))
-print('min',np.min(tp_count),np.min(tn_count),np.min(fp_count),np.min(fp_count))
-print('max',np.max(tp_count),np.max(tn_count),np.max(fp_count),np.max(fn_count))
+print('min(tp, tn, fp,fn) ',np.min(tp_count),' ',np.min(tn_count),' ',np.min(fp_count),' ',np.min(fn_count))
+print('max(tp,tn,fp,fn) ',np.max(tp_count),' ',np.max(tn_count),' ',np.max(fp_count),' ',np.max(fn_count))
 
 y_dl_true = list(np.ones(num_pos))+list(np.zeros(num_neg))
 y_dl_probas = pred_dl_pos+pred_dl_neg
@@ -160,6 +175,9 @@ fpr_bl, tpr_bl, threshold_bl = metrics.roc_curve(y_bl_true, y_bl_probas,pos_labe
 
 roc_auc_dl = metrics.auc(fpr_dl, tpr_dl)
 roc_auc_bl = metrics.auc(fpr_bl, tpr_bl)
+
+print("AUC DLBCL: ", roc_auc_dl)
+
 #roc_auc = metrics.auc(fp_rate, tp_rate)
 font = {'family' : 'Calibri',
         'weight' : 'bold',
@@ -169,7 +187,7 @@ matplotlib.rc('font', **font)
 
 #plt.title('ROC (fourth of training set)')
 plt.plot(fpr_dl, tpr_dl, color='mediumspringgreen', linewidth=1.3,linestyle=':',label = 'Accuracy (AUC) DLBCL = %0.2f' % roc_auc_dl)
-plt.plot(fpr_bl, tpr_bl, color='mediumblue', linestyle='-.',linewidth=1.3,label = 'Accuracy (AUC) BL = %0.2f' % roc_auc_bl)
+#plt.plot(fpr_bl, tpr_bl, color='mediumblue', linestyle='-.',linewidth=1.3,label = 'Accuracy (AUC) BL = %0.2f' % roc_auc_bl)
 plt.legend(loc = 'lower right')
 plt.plot([0, 1], [0, 1],color='darkgray',linestyle='dashed')
 plt.xlim([0, 1])
