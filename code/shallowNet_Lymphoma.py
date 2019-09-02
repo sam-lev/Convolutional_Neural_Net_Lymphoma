@@ -4,7 +4,7 @@
 #SBATCH --mem=120G
 #SBATCH -o model_shallow.out-%j # name of the stdout, using the job number (%j) and the first node (%N)
 #SBATCH -e model_shallow.err-%j # name of the stderr, using the job number (%j) and the first node (%N)
-#SBATCH --gres=gpu:3
+#SBATCH --gres=gpu:4
 
 import numpy as np
 import tensorflow as tf
@@ -55,10 +55,19 @@ python3 denseNet_Lymphoma.py --tot test --gpu 0,1 --batch_size 500 --model_name 
 """
 
 class Model(ModelDesc):
-    def __init__(self, depth):
+    def __init__(self, depth, class_0, class_1):
         super(Model, self).__init__()
         self.N = int((depth - 4)  / 3)
         self.growthRate = 32
+        if class_0 == class_1:
+           self.class_0 = 1.0
+           self.class_1 = 1.0
+        else:
+           self.class_0 = float(class_0)
+           self.class_1 = float(class_1)
+           
+        print(">>> class 0: ", self.class_0)
+        print(">>> class 1: ", self.class_1)
 
     def _get_inputs(self):
         return [InputDesc(tf.float32, [None, 224, 224, 3], 'input'),
@@ -67,7 +76,7 @@ class Model(ModelDesc):
 
     def _build_graph(self, input_vars):
         image, label = input_vars
-        image = image / 128.0 - 1
+        #image = image / 128.0 - 1
         
         def conv(name, l, channel, stride):
             return Conv2D(name, l, channel, 6, stride=stride,
@@ -118,12 +127,13 @@ class Model(ModelDesc):
             logits = FullyConnected('linear', l, out_dim=2, nl=tf.identity)
 
             return logits
-
+         
         logits = dense_net("dense_net") #map probabilities to real domain
 
         prob = tf.nn.softmax(logits, name='output')  #a generalization of the logistic function that "squashes" a K-dim vector z  of arbitrary real values to a K-dim vector sigma( z ) of real values in the range [0, 1] that add up to 1.
-        factor = 730./(730+1576)
-        class_weights = tf.constant([1.0,1.0])#factor, 1.0-factor]) #dl 730 bl 1576
+        factorbl = (self.class_0+self.class_1)/(2.0*self.class_0)
+        factordl = (self.class_0+self.class_1)/(2.0*self.class_1)
+        class_weights = tf.constant([factorbl, factordl])#factor,(1-factor)])#factor, 1.0-factor]) #dl 730 bl 1576
         weights = tf.gather(class_weights, label)
         cost = tf.losses.sparse_softmax_cross_entropy(label, logits, weights=weights) #False positive 3* False negatives so adjust weight by factor
         cost = tf.reduce_mean(cost, name='cross_entropy_loss') #normalize
@@ -143,22 +153,29 @@ class Model(ModelDesc):
         self.cost = tf.add_n([cost, wd_cost], name='cost')
 
     def _get_optimizer(self):
-        lr = tf.get_variable('learning_rate', initializer=0.1, trainable=False)
+        lr = tf.get_variable('learning_rate', initializer=0.01, trainable=False)
         tf.summary.scalar('learning_rate', lr)
-        return tf.train.AdamOptimizer(lr, beta1=0.9, beta2=0.999,epsilon=1e-08)#MomentumOptimizer(lr, 0.9, use_nesterov=True)
+        return tf.train.AdamOptimizer(lr, beta1=0.88, beta2=0.999,epsilon=1e-08)#MomentumOptimizer(lr, 0.9, use_nesterov=True)
 
 
 def get_data(train_or_test, unknown_dir = None, original_dir=None):
     isTrain = train_or_test == 'train'
+    isVal = train_or_test == 'val'
     ds =  datapack.lymphoma2(train_or_test, dir = '../data', unknown_dir = unknown_dir,original_dir=original_dir)
+
+    if train_or_test == 'train':
+       args.class_0 = ds.class_0
+       args.class_1 = ds.class_1
+       
     #pp_mean = ds.get_per_pixel_mean()
-    if isTrain:
+    if isTrain or isVal:
        augmentors = [
           #and dividing by the standard deviation
           imgaug.CenterPaste((224, 224)),
           imgaug.Flip(horiz=True),
           ##datapack.NormStainAug(),
-          datapack.HematoEAug(low=0.7, high=1.3, seed=None),
+          datapack.HematoEAug((0.7, 1.3, None)),
+          datapack.NormStainAug(),
           ##ZoomAug(zoom=10,seed=None),
        ]
     else:
@@ -166,11 +183,12 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
             #imgaug.MapImage(lambda x: x - pp_mean),
             #imgaug.Brightness(20),
             imgaug.CenterPaste((224, 224)),
+            datapack.NormStainAug(),
             #imgaug.MapImage(lambda x: x - pp_mean),
         ]
-
+   
     ds = AugmentImageComponent(ds, augmentors)
-
+    
     print(">>>>>>> Data Set Size: ", ds.size())
     
     batch_size = None
@@ -196,12 +214,12 @@ def get_config(train_or_test, train_config = None):
     # prepare dataset
     # dataflow structure [im, label] in parralel
     if isTrain:
-       dataset_train = get_data('train') 
+       dataset_train = get_data('train')
        steps_per_epoch = dataset_train.size() #20
        dataset_val = get_data('val')
-
+   
     # dense net
-    denseModel = Model(depth=args.depth) #Use designed graph above, inheret from ModelDesc
+    denseModel = Model(depth=args.depth, class_0 = args.class_0, class_1 = args.class_1) #Use designed graph above, inheret from ModelDesc
     # ! update here to build_graph() call bc _build_graph depricated
     
     if isTrain:
@@ -212,7 +230,7 @@ def get_config(train_or_test, train_config = None):
                 InferenceRunner(dataset_val,
                                 [ScalarStats('cost'), ClassificationError()]), #Compare to validation set
                 ScheduledHyperParamSetter('learning_rate',
-                                          [(1, args.lr_0), (args.drop_1, args.lr_1), (args.drop_2, args.lr_2)]) # denote current hyperparameters
+                                          [(args.drop_0, args.lr_0), (args.drop_1, args.lr_1), (args.drop_2, args.lr_2)]) # denote current hyperparameters
             ],
             model=denseModel,
             session_creator = None,
@@ -236,12 +254,12 @@ class predictModel:
     def __init__(self, config, data = None):
         self.test_data = data
         self.predictor = SimpleDatasetPredictor(config, self.test_data)
-
+   
     def _get_inputs(self):
         return [InputDesc(tf.float32, [None, 224, 224, 3], 'input'),
                 InputDesc(tf.int32, [None], 'label')
                ]
-
+   
     def get_results(self):
         res = []
         all_res = []
@@ -252,19 +270,20 @@ class predictModel:
             all_res.append(  ["element", prob , training_error, cross_entropy, img] )
         return res, all_res
 
-        
+
 if __name__ == '__main__':
    parser = argparse.ArgumentParser()
    parser.add_argument('--model_name',type= str, default='MODEL',help="Name to prepend on model during training")
    parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.') 
    parser.add_argument('--load', help='load model')
-   parser.add_argument('--drop_1',default=80, help='Epoch to drop learning rate to 0.01.')
-   parser.add_argument('--drop_2',default=150,help='Epoch to drop learning rate to 0.001')
+   parser.add_argument('--drop_0',default=1, help='Epoch to drop learning rate to lr_0.')
+   parser.add_argument('--drop_1',default=80, help='Epoch to drop learning rate to lr_1.')
+   parser.add_argument('--drop_2',default=150,help='Epoch to drop learning rate to lr_2.')
    parser.add_argument('--lr_0',type=float, default=0.1,help='second learning rate')
    parser.add_argument('--lr_1',type=float, default=0.01, help='first learning rate')             
    parser.add_argument('--lr_2',type=float, default=0.001,help='second learning rate')
    parser.add_argument('--batch_size',type=int, default=4,help='batch size')
-   parser.add_argument('--depth',type=int, default=82, help='The depth of densenet')
+   parser.add_argument('--depth',type=int, default=13, help='The depth of densenet')
    parser.add_argument('--max_epoch',type= int, default=256,help='max epoch')
    parser.add_argument('--tot',type= str, default='train',help=" 'train' or 'test'")
    parser.add_argument('--out_dir',type= str, default='../data/Unknowns/predictions/',help="img out dir")
@@ -274,6 +293,8 @@ if __name__ == '__main__':
    parser.add_argument('--num_gpu',type= int,help="Number GPU to use if not specificaly assigned")
    parser.add_argument('--gpu_frac',type= float,default=0.99,help="Number GPU to use if not specificaly assigned")
    parser.add_argument('--mp',default=True,help="Whether or not to use parallel multiprocessing over or on GPU. 0 no, 1 yes. Default yes.")
+   parser.add_argument('--class_0',type=int, default=0,help="number samples in class 0")
+   parser.add_argument('--class_1',type=int, default=0,help="number samples in class 1")
    args = parser.parse_args()
    
    BATCH_SIZE = args.batch_size
@@ -288,14 +309,14 @@ if __name__ == '__main__':
          
    if not args.tot:
       args.tot == 'train'
-
+   
    if args.tot =='train':
       gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction = args.gpu_frac, allow_growth=True)
       #session_config = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, log_device_placement=True)
       session_config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement = True) #or session creator
    else:
       session_config = None
-
+   
    
    config = get_config(args.tot, train_config=session_config) #train_sess_creator
    print(tf.test.is_gpu_available())                                                                                            
@@ -325,7 +346,7 @@ if __name__ == '__main__':
       # retrieve unknown from /data/Unknown/unknown_dir   optional save data to original_dir (creates if d.n.e.)
       # writes predictions (image and summary file) to path = '../data/Unknown/'+args.unknown_dir +'/predictions/'
       data = get_data('test', unknown_dir = args.unknown_dir, original_dir=args.original_dir)
-
+      
       def classify_unknown(model_config, dp, args):
          predictor = predictModel(config, dp)
          res, all_res = predictor.get_results()
@@ -334,7 +355,8 @@ if __name__ == '__main__':
          BL_count = 0
          DLBCL_count = 0
          tie = 0
-      
+         path = ''
+         
          for i, op in enumerate(res[0][4]):
             prediction.append(res[0][1][i])
             img_list.append(op)
@@ -348,10 +370,14 @@ if __name__ == '__main__':
             im.save(path + '/' +str(i)+"_"+str(res[0][1][i])+'.jpeg')
             im.close()
             
+            path = '../data/Predictions/'+args.unknown_dir
+            if not os.path.exists( path ):
+               os.makedirs( path )
+            
             path = path+'/predictions.txt'
             if os.path.exists(path):
                append_write = 'a'
-               #write results to file                                                                                          
+               #write results to file                   
             else:
                append_write = 'w'
             prediction_file = open(path, append_write)
@@ -363,7 +389,8 @@ if __name__ == '__main__':
             if res[0][1][i][1] == 0.5:
                tie += 1
             prediction_file.close()
-         prediction_summary = open( '../data/Unknown/'+args.unknown_dir+'/predictions/predictions.txt', 'a')
+         prediction_summary = open( path, 'a')
+         #'../data/Unknown/'+args.unknown_dir+'/predictions/predictions.txt', 'a')
          prediction_summary.write("\n")
          if tie:
             prediction_summary.write(str(BL_count)+','+str(DLBCL_count)+"\n")

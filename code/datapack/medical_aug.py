@@ -143,7 +143,7 @@ class normalize_staining(imgaug.transform.ImageTransform):
         HE = HE.T
         Y = OD.reshape(h * w, c).T
         
-        C = np.linalg.lstsq(HE, Y)
+        C = np.linalg.lstsq(HE, Y, rcond=None)
         maxC = np.percentile(C[0], 99, axis=1)
         
         C = C[0] / maxC[:, None]

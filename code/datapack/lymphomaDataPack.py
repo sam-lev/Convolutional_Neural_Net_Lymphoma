@@ -64,11 +64,10 @@ def save_original(img, save_dir = None, name="temp"):
 def read_lymphoma(filenames,  train_or_test = 'train', original_dir=None):
     num_show=5
     ret = []
+    class_0 = 0
+    class_1 = 0
     for fname in filenames:
-
-        #fo = open(fname, 'rb')
-
-        #if six.PY3:
+        
         with open(fname, 'rb') as fo:
             try:
                 dic = pickle.load(fo)
@@ -76,16 +75,16 @@ def read_lymphoma(filenames,  train_or_test = 'train', original_dir=None):
                 fo.seek(0)
                 dic = pickle.load(fo, encoding='latin1')
                 
-        #dic = pickle.load(fo,encoding='latin1')
-
-        #else:
-        #dic = pickle.load(fo, encoding='bytes')
         data = dic['data']
         label = dic['labels']
         fo.close()
-        for tile in range(2):
+        if train_or_test == 'test':
+            multi_crop = 1
+        else:
+            multi_crop = 2
+        for tile in range(multi_crop):
             if tile == 1:
-                part = max(int(0.2*len(data)),1)
+                part = min(len(data),10)
             else:
                 part = len(data)
             for k in range(part):
@@ -94,8 +93,6 @@ def read_lymphoma(filenames,  train_or_test = 'train', original_dir=None):
                 cropsize = (np.max(np.array(img.shape)), np.max(np.array(img.shape)[np.array(img.shape) < np.max(np.array(img.shape))]), 3) 
                 scaleSize = 224,224
                 imSize = 672
-                if train_or_test == 'test':
-                    imsize = 672
                 #randPos = rnd.choice([0, 50, 100, 200, 300])
                 #img = data[k][:, randPos:(randPos+imSize), randPos:(randPos+imSize)] #:32, :32] #size currently (927,1276,3)
                 
@@ -104,21 +101,14 @@ def read_lymphoma(filenames,  train_or_test = 'train', original_dir=None):
                         os.mkdirs(original_dir)
                     save_original(data[k][:,:, :], save_dir=original_dir, name=k)
                 
-                ##quality_cropper = quality_random_crop(data[k][:,:, :], imSize)    
+                ##quality_cropper = quality_random_crop(data[k][:,:, :],imSize)
                 ##img = quality_cropper.random_crop_select()  
                 
                 # make rgb feasible
                 img = np.transpose(img, [1, 2, 0])
                 
-                # format required for DataFlow
-                ##img = Image.fromarray(img,'RGB')
-                ##img = img.resize(scaleSize, Image.ANTIALIAS)#thumbnail(scaleSize) #image.resize(THUMB_SIZE, Image.ANTIALIAS)
-                if num_show < 5:
-                    img.show()
-                    num_show=5
-                
-                start_w = [0, 500][tile]
-                start_h = [0, 400][tile]
+                start_w = [100, 500][tile]
+                start_h = [100, 400][tile]
                 img = img[start_w:(start_w+imSize),start_h:(start_h+imSize),:]
 
                 #img = hematoxylin_eosin_aug(low = 0.7, high = 1.3).apply_image(img)
@@ -128,37 +118,34 @@ def read_lymphoma(filenames,  train_or_test = 'train', original_dir=None):
                 img = img.resize(scaleSize, Image.ANTIALIAS)
                 
                 img = np.asarray(img).reshape((224,224,3))
-                
-                #img.tofile(str(k)+'.raw')
-                #test.show()
-                #img = np.transpose(img, [1,2,0])
+
+                if label[k] == 0:
+                    class_0 += 1
+                else:
+                    class_1 += 1
                 ret.append([img, label[k]])
 
-    return ret
+    return (ret, class_0, class_1)
 
 def get_filenames(dir, train_or_test, num_files = None, unknown_dir = None):
-
+    filenames = []
     if train_or_test == 'train':
         path, dirs, files_train = next(os.walk(os.path.join(dir, 'train')))
         file_count = len(files_train)
-        filenames = [os.path.join(dir, 'train', batch) for batch in files_train]#'batch_data_%d.p' % i) for i in range(num_files+1)] #as more data is obtained
+        filenames = [os.path.join(dir, 'train', batch) for batch in files_train]#
         print( ">>>>>>>>>> Using ", str(file_count), " batched files.")
-    else:
-        filenames = ['val']
+    
     if train_or_test == 'val':
         path_val, dirs_val, files_val = next(os.walk(os.path.join(dir, 'test')))
         file_count_val = len(files_val)
-        filenames.append([os.path.join(dir, 'test',batch) for batch in files_val])#'test_batch_%d.p' % i) for i in range(file_count_val)]) #'blackbox' #  'test_batch_%d.p'
+        filenames = [os.path.join(dir, 'test',batch) for batch in files_val]#
         print(">>>>>>>>>> Using ", str(file_count_val), " validation batch files.")
     else:
         if unknown_dir:
             path_unknown, dirs_unknown, files_unknown = next(os.walk(os.path.join(dir, 'Unknown',unknown_dir)))
             file_count_unknown = len(files_unknown)
-            filenames.append([os.path.join(dir, 'Unknown',unknown_dir,f) for f in files_unknown]) #unknown_dir+'.p')]) #,f) for f in files_unknown])
-        else:
-            group = ['A_0','B_0','C_0','D_0','E_0','F_0','G_0','H_0','I_0','J_0','J_0_0','J_1_0','K_0','L_0','M_0','N_0','O_0','P_0','Q_0','R_0','S_0']
-            #filenames.append([os.path.join(dir, val_or_test[0],'G_%d.p' % i) for i in range(1)])
-            filenames.append([os.path.join(dir, val_or_test[0],group[i]+'.p') for i in [12]])#range(1)])
+            filenames = [os.path.join(dir, 'Unknown',unknown_dir,f) for f in files_unknown]
+        
     return filenames
 
 class lymphomaBase( RNGDataFlow ):
@@ -180,15 +167,22 @@ class lymphomaBase( RNGDataFlow ):
             dir = '../data' #and changes in behavor for more classes here
         fnames = get_filenames(dir, train_or_test, num_files, unknown_dir=unknown_dir)
         
-        if train_or_test == 'train':
-            self.fs = fnames[:-1]
-        else:
-            self.fs = [f for f in fnames[-1]]
+        self.fs = fnames
+
         for f in self.fs:
             if not os.path.isfile(f):
                 raise ValueError('Failed to find file: ' + f)
         self.train_or_test = train_or_test
-        self.data = read_lymphoma(self.fs, train_or_test = self.train_or_test, original_dir=original_dir) #different classes changes here ect..
+        print(">> reading in files.")
+        data = read_lymphoma(self.fs, train_or_test = self.train_or_test, original_dir=original_dir) #different classes changes here ect..
+        self.data = data[0]
+        self.class_0 = data[1]
+        self.class_1 = data[2]
+        print("")
+        print(">>>> ", train_or_test," set >>>")
+        print(">>> Total class 0 samples: ", self.class_0)
+        print(">>> Total class 1 samples: ", self.class_1)
+        print("")
         self.dir = dir
         self.shuffle = shuffle
         
