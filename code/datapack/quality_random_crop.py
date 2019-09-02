@@ -1,10 +1,10 @@
 #!/home/sci/samlev/bin/bin/python3                                              
 
 #SBATCH --time=21-00:00:00 # walltime, abbreviated by -t                       
-#SBATCH --mem=30G                                                             
-#SBATCH -o slurm-%j.out-%N # name of the stdout, using the job number (%j) and the first node (%N)                                                            
+#SBATCH --mem=120G                                                             
+#SBATCH -o slurm-%j.out-%N # name of the stdout, using the job number (%j) and the first node (%N)                                
 #SBATCH -e slurm-%j.err-%N # name of the stderr, using the job number (%j) and the first node (%N)   
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:8
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,16 +25,17 @@ class quality_random_crop:
 
     def get_tile_image(self, image):
         imSize=self.image_size
+        shapein = image.shape
         img_tiles = []
         stride = 272
-        if image.shape[1] > 1000 and image.shape[2] > 1500:
+        if False and image.shape[1] > 1000 and image.shape[0] > 1500:
             rand_y = rnd.choice([0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275])
             rand_pos = rnd.choice([150, 150+stride, 150+(2*stride), 150+(3*stride)])
         else:
             stride = 100
-            rand_y = rnd.choice([0, 25, 50, 75, 100, 125])
+            rand_y = rnd.choice([0, 25, 50, 75])
             rand_pos = rnd.choice([150, 150+stride, 150+(2*stride), 150+(3*stride)])  
-        img = image[:,(150+rand_y):((150+rand_y)+imSize), rand_pos:(rand_pos+imSize)] #:32, :32] #size currently (927,1276,3)
+        img = image[(150+rand_y):((150+rand_y)+imSize), rand_pos:(rand_pos+imSize),:] #:32, :32] #size currently (927,1276,3)
         img_tiles.append(img)
         return  img_tiles[0]
 
