@@ -168,26 +168,27 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
        args.class_1 = ds.class_1
        
     #pp_mean = ds.get_per_pixel_mean()
-    if isTrain or isVal:
+    if isTrain:
        augmentors = [
           #and dividing by the standard deviation
-          imgaug.CenterPaste((224, 224)),
-          imgaug.Flip(horiz=True),
+          #imgaug.CenterPaste((224, 224)),
           ##datapack.NormStainAug(),
           datapack.HematoEAug((0.7, 1.3, None)),
           datapack.NormStainAug(),
+          imgaug.Flip(horiz=True),
           ##ZoomAug(zoom=10,seed=None),
        ]
+       ds = AugmentImageComponent(ds, augmentors)
     else:
         augmentors = [
             #imgaug.MapImage(lambda x: x - pp_mean),
             #imgaug.Brightness(20),
-            imgaug.CenterPaste((224, 224)),
+            #imgaug.CenterPaste((224, 224)),
             datapack.NormStainAug(),
             #imgaug.MapImage(lambda x: x - pp_mean),
         ]
    
-    ds = AugmentImageComponent(ds, augmentors)
+    #ds = AugmentImageComponent(ds, augmentors)
     
     print(">>>>>>> Data Set Size: ", ds.size())
     
@@ -235,7 +236,6 @@ def get_config(train_or_test, train_config = None):
             model=denseModel,
             session_creator = None,
             session_config = train_config,
-            #session_creator = train_sess_creator
             steps_per_epoch=steps_per_epoch,
             max_epoch=args.max_epoch,
         )
@@ -319,11 +319,11 @@ if __name__ == '__main__':
    
    
    config = get_config(args.tot, train_config=session_config) #train_sess_creator
-   print(tf.test.is_gpu_available())                                                                                            
-   print(get_available_gpus())
+   #print(tf.test.is_gpu_available())                                                                                            
+   #print(get_available_gpus())
       
    if args.load:
-      print(">>>> Loading model.")
+      print(">>>> Loading stored model parameters.")
       # example args.load '/path/to/model/folder/model-xxxx'
       config.session_init = SaverRestore(args.load)
       

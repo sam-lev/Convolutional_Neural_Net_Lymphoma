@@ -112,13 +112,12 @@ def read_lymphoma(filenames,  train_or_test = 'train', original_dir=None):
                 img = img[start_w:(start_w+imSize),start_h:(start_h+imSize),:]
 
                 #img = hematoxylin_eosin_aug(low = 0.7, high = 1.3).apply_image(img)
-                #img = normalize_staining().apply_image(img)
-                
                 img = Image.fromarray(img,'RGB')                              
                 img = img.resize(scaleSize, Image.ANTIALIAS)
                 
                 img = np.asarray(img).reshape((224,224,3))
-
+                if train_or_test != 'train':
+                    img = normalize_staining().apply_image(img)
                 if label[k] == 0:
                     class_0 += 1
                 else:

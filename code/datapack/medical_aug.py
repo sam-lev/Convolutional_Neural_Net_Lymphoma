@@ -34,17 +34,18 @@ class NormStainAug(imgaug.ImageAugmentor):
         self._init(locals())
         
     
-    def get_transform(self, img):
+    def get_transform(self, _):
         return normalize_staining()
     
     def apply_coords(self, coords):
         return coords
     
-    def _get_augment_params(self, img):
+    def _get_augment_params(self, _):
         return np.random.randint(100)
     
     def _augment(self, img, _):
-        t = self.get_transform(img).apply_image(img)
+        p_holder = np.array([0])
+        t = self.get_transform(p_holder).apply_image(img)
         return t
     
     #def reset_state(self):
@@ -57,19 +58,20 @@ class ZoomAug(imgaug.ImageAugmentor):
         self.seed = seed[1]
         self._init(locals())
         
-    def get_transform(self, img):
+    def get_transform(self, _):
         return zoom_transform(self.zoom, self.seed)
     
     def	apply_coords(self, coords):
         return coords
     
-    def _get_augment_params(self, img):
+    def _get_augment_params(self, _):
         return (self.zoom, self.seed)
     
     def	_augment(self, img, param = (10, None)):
         self.zoom = param[0]
         self.seed = param[1]
-        t = self.get_transform(img).apply_image(img)
+        p_holder = np.array([0])
+        t = self.get_transform(p_holder).apply_image(img)
         return t
 
 class HematoEAug(imgaug.ImageAugmentor):
@@ -81,20 +83,21 @@ class HematoEAug(imgaug.ImageAugmentor):
         self._init(locals())
         
         
-    def get_transform(self, img):
+    def get_transform(self, _):
         return hematoxylin_eosin_aug(self.low, self.high, self.seed)
     
     def apply_coords(self, coords):
         return coords
     
-    def _get_augment_params(self, img):
+    def _get_augment_params(self, _):
         return (self.low, self.high, self.seed)
     
     def	_augment(self, img, param = (0.7, 1.3, None)):
         self.low = param[0]
         self.high = param[1]
         self.seed = param[2]
-        t = self.get_transform(img).apply_image(img)
+        p_holder = np.array([0])
+        t = self.get_transform(p_holder).apply_image(img)
         return t
 
 class normalize_staining(imgaug.transform.ImageTransform):
