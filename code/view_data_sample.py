@@ -11,12 +11,17 @@ for d in ds:
         im = d
     c+=1
 
-im_aug = datapack.medical_aug.hematoxylin_eosin_aug(low = 0.6, high = 1.4).apply_image(im[0])
+im_aug_he = datapack.medical_aug.hematoxylin_eosin_aug(low = 0.6, high = 1.4).apply_image(im[0])
+
+im_aug_norm = datapack.medical_aug.normalize_staining().apply_image(im[0])
 
 from PIL import Image
 
-aug = Image.fromarray(im_aug)
-aug.show()
+aug_he = Image.fromarray(im_aug_he)
+aug_he.show()
+
+aug_norm = Image.fromarray(im_aug_norm)
+aug_norm.show()
 
 img_og = Image.fromarray(im[0])
 img_og.show()
