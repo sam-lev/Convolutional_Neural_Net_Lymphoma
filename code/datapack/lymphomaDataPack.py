@@ -199,7 +199,7 @@ class lymphomaBase( RNGDataFlow ):
     def __iter__(self):
         idxs = np.arange(len(self.data))
         if self.shuffle:
-            self.rng.shuffle(idxs)
+            np.random.shuffle(idxs)
         for k in idxs:
             # since cifar is quite small, just do it for safety
             yield self.data[k]
