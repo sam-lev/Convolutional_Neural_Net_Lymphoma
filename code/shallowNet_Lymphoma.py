@@ -4,7 +4,7 @@
 #SBATCH --mem=120G
 #SBATCH -o model_shallow.out-%j # name of the stdout, using the job number (%j) and the first node (%N)
 #SBATCH -e model_shallow.err-%j # name of the stderr, using the job number (%j) and the first node (%N)
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:5
 
 import numpy as np
 import tensorflow as tf
@@ -79,9 +79,14 @@ class Model(ModelDesc):
         #image = image / 128.0 - 1
         
         def conv(name, l, channel, stride):
-            return Conv2D(name, l, channel, 6, stride=stride,
-                          nl=tf.identity, use_bias=False,
-                          W_init = tf.contrib.layers.variance_scaling_initializer(factor=2.0, mode='FAN_AVG', uniform=False)) #factor=np.sqrt(2.0/(6+channel)), mode='FAN_IN', uniform=False, seed=None, dtype=tf.float32))   #tf.random_normal_initializer(stddev=np.sqrt(2.0/3/channel)))
+           rand_seed = np.random.randint(2**32-1)
+           np.random.seed(101)
+           conv2d_xav = Conv2D(name, l, channel, 6, stride=stride,
+                               nl=tf.identity, use_bias=False,
+                               W_init = tf.contrib.layers.variance_scaling_initializer(factor=2.0, mode='FAN_AVG', uniform=False)) #factor=np.sqrt(2.0/(6+channel)), mode='FAN_IN', uniform=False, seed=None, dtype=tf.float32))   #tf.random_normal_initializer(stddev=np.sqrt(2.0/3/channel)))
+           np.random.seed(rand_seed)
+           return conv2d_xav
+        
         def add_layer(name, l):
             shape = l.get_shape().as_list()
             in_channel = shape[3]
@@ -173,12 +178,13 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
           #and dividing by the standard deviation
           #imgaug.CenterPaste((224, 224)),
           ##datapack.NormStainAug(),
-          datapack.HematoEAug((0.7, 1.3, None)),
+          datapack.HematoEAug((0.2, 2.3, np.random.randint(2**32-1))),
           datapack.NormStainAug(),
           imgaug.Flip(horiz=True),
           ##ZoomAug(zoom=10,seed=None),
        ]
-       ds = AugmentImageComponent(ds, augmentors)
+       augmentor = imgaug.AugmentorList(augmentors)
+       #ds = AugmentImageComponent(ds, augmentors)
     else:
         augmentors = [
             #imgaug.MapImage(lambda x: x - pp_mean),
@@ -187,8 +193,11 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
             datapack.NormStainAug(),
             #imgaug.MapImage(lambda x: x - pp_mean),
         ]
+        augmentor = AugmentImageComponent(ds, augmentors)
    
-    #ds = AugmentImageComponent(ds, augmentors)
+    #augmentor_list = AugmentorList(augmentors)
+    #augmentor = AugmentImageComponent(ds, augmentors)
+    augmentor.reset_state()
     
     print(">>>>>>> Data Set Size: ", ds.size())
     
@@ -200,10 +209,21 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
     else:
        batch_size = args.batch_size
        
-    ds = BatchData(ds, batch_size, remainder=not isTrain)
+    #ds = BatchData(ds, batch_size, remainder=not isTrain)
     if isTrain:
-       ds = PrefetchData(ds, nr_prefetch = args.batch_size * args.num_gpu, nr_proc=50)
-        
+       #ds = PrefetchData(ds, nr_prefetch = args.batch_size * args.num_gpu, nr_proc=args.num_gpu)
+       ds = MultiThreadMapData(ds,
+                               nr_thread=args.batch_size * args.num_gpu,
+                               map_func=lambda dp: [augmentor._augment(dp[0],
+                                                                       param=((0.2, 2.3, np.random.randint(2**32-1)),
+                                                                              (0),
+                                                                              (True,False,0.5))),
+                                                    dp[1]],
+                               buffer_size=args.batch_size)
+       ds = PrefetchDataZMQ(ds, nr_proc=1)#args.num_gpu)
+       ds = BatchData(ds, batch_size, remainder=not isTrain)
+    else:
+       ds = BatchData(augmentor, batch_size, remainder=not isTrain)
     return ds
 
     
@@ -228,8 +248,9 @@ def get_config(train_or_test, train_config = None):
             dataflow=dataset_train,
             callbacks=[
                 ModelSaver(), # Record state graph at intervals during epochs
-                InferenceRunner(dataset_val,
-                                [ScalarStats('cost'), ClassificationError()]), #Compare to validation set
+                DataParallelInferenceRunner(input=dataset_val,
+                                            infs=[ScalarStats('cost'), ClassificationError()],
+                gpus=args.num_gpu), #Compare to validation set
                 ScheduledHyperParamSetter('learning_rate',
                                           [(args.drop_0, args.lr_0), (args.drop_1, args.lr_1), (args.drop_2, args.lr_2)]) # denote current hyperparameters
             ],
@@ -341,7 +362,7 @@ if __name__ == '__main__':
       else:
          if args.num_gpu:
             print(">>>> Using "+str(args.num_gpu)+" available GPU.")
-            launch_train_with_config(config, SyncMultiGPUTrainerReplicated(args.num_gpu))     
+            launch_train_with_config(config, SyncMultiGPUTrainerReplicated(args.num_gpu, mode = 'hierarchical'))     
    else:
       # retrieve unknown from /data/Unknown/unknown_dir   optional save data to original_dir (creates if d.n.e.)
       # writes predictions (image and summary file) to path = '../data/Unknown/'+args.unknown_dir +'/predictions/'

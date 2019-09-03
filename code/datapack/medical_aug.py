@@ -12,7 +12,8 @@ from os import makedirs
 #from threaded_generator import threaded_generator
 from time import time
 import sys
-np.random.seed(101)
+
+#np.random.seed(101)
 
 PATCH_SIZES = [224, 224] #[672,672]
 SCALES = [0.5]
@@ -33,6 +34,8 @@ class NormStainAug(imgaug.ImageAugmentor):
         super(NormStainAug, self).__init__()
         self._init(locals())
         
+    def reset_state(self):
+        super(NormStainAug, self).reset_state()
     
     def get_transform(self, _):
         return normalize_staining()
@@ -55,8 +58,15 @@ class ZoomAug(imgaug.ImageAugmentor):
     def __init__(self, param = (10, None)):
         super(ZoomAug, self).__init__()
         self.zoom = zoom[0]
-        self.seed = seed[1]
+        if param[1] is None:
+            self.seed = np.random.randint(2**32-1)
+        else:
+            self.seed = seed[1]
         self._init(locals())
+        
+    def	reset_state(self):
+        super(ZoomAug, self).reset_state()
+        self.seed = np.random.randint(2**32-1)
         
     def get_transform(self, _):
         return zoom_transform(self.zoom, self.seed)
@@ -75,14 +85,17 @@ class ZoomAug(imgaug.ImageAugmentor):
         return t
 
 class HematoEAug(imgaug.ImageAugmentor):
-    def __init__(self, param = (0.7, 1.3, None)):
+    def __init__(self, param = (0.2, 2.3, None)):
         super(HematoEAug, self).__init__()
         self.low = param[0]
         self.high = param[1]
         self.seed = param[2]
         self._init(locals())
         
-        
+    def	reset_state(self):
+        super(HematoEAug, self).reset_state()
+        self.seed = np.random.randint(2**32-1)
+    
     def get_transform(self, _):
         return hematoxylin_eosin_aug(self.low, self.high, self.seed)
     
@@ -90,12 +103,16 @@ class HematoEAug(imgaug.ImageAugmentor):
         return coords
     
     def _get_augment_params(self, _):
+        self.seed = np.random.randint(2**32-1)
         return (self.low, self.high, self.seed)
     
     def	_augment(self, img, param = (0.7, 1.3, None)):
         self.low = param[0]
         self.high = param[1]
-        self.seed = param[2]
+        if param[2] is None:
+            self.seed = np.random.randint(2**32-1)
+        else:
+            self.seed = param[2]
         p_holder = np.array([0])
         t = self.get_transform(p_holder).apply_image(img)
         return t
