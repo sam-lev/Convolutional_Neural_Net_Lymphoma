@@ -152,7 +152,7 @@ class lymphomaBase( RNGDataFlow ):
     # yields [ Image, Label ]
     # image: 900x900x3 in range [0,255]
     # label: int either 0 or 1
-    def __init__(self, train_or_test, num_files=None, shuffle=True, dir=None, lymphoma_num_classes=2,unknown_dir = None, original_dir=None):
+    def __init__(self, train_or_test, num_files=None, shuffle=None, dir=None, lymphoma_num_classes=2,unknown_dir = None, original_dir=None):
         assert train_or_test in ['train', 'test', 'val']
         assert lymphoma_num_classes == 2 or lymphoma_num_classes == 10
         self.lymphoma_num_classes = lymphoma_num_classes
@@ -233,7 +233,7 @@ class lymphoma2(lymphomaBase):
             train_or_test (str): either 'train' or 'test'.
             shuffle (bool): shuffle the dataset.
         """
-        if shuffle == None and train_or_test = 'train':
+        if shuffle == None and train_or_test == 'train':
             shuffle = True
         else:
             shuffle = False
