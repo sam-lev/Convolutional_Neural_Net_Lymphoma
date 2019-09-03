@@ -233,6 +233,10 @@ class lymphoma2(lymphomaBase):
             train_or_test (str): either 'train' or 'test'.
             shuffle (bool): shuffle the dataset.
         """
+        if shuffle == None and train_or_test = 'train':
+            shuffle = True
+        else:
+            shuffle = False
         super(lymphoma2, self).__init__(train_or_test, num_files = None, shuffle = train_or_test == 'train', dir=dir, lymphoma_num_classes = 2,unknown_dir = unknown_dir, original_dir = original_dir)
 
 if __name__ == '__main__':
