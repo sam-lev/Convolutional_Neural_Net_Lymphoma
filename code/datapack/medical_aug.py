@@ -50,14 +50,6 @@ class NormStainAug(imgaug.ImageAugmentor):
         p_holder = np.array([0])
         t = self.get_transform(p_holder).apply_image(img)
         return t
-
-    def get_augment_params(self, _):
-        return np.random.randint(100)
-    
-    def augment(self, img, _):
-        p_holder = np.array([0])
-        t = self.get_transform(p_holder).apply_image(img)
-        return t
     
     #def reset_state(self):
     #    super(NormStainAug, self).reset_state()
@@ -88,15 +80,6 @@ class ZoomAug(imgaug.ImageAugmentor):
     def	_augment(self, img, param = (10, None)):
         self.zoom = param[0]
         self.seed = param[1]
-        p_holder = np.array([0])
-        t = self.get_transform(p_holder).apply_image(img)
-        return t
-
-    def get_augment_params(self, _):
-        return (self.zoom, np.random.randint(2**32-1))
-    
-    def	augment(self, img):
-        self.zoom, self.seed = get_augment_params(img)
         p_holder = np.array([0])
         t = self.get_transform(p_holder).apply_image(img)
         return t
@@ -134,22 +117,7 @@ class HematoEAug(imgaug.ImageAugmentor):
         t = self.get_transform(p_holder).apply_image(img)
         return t
 
-    def get_augment_params(self, _):
-        self.seed = np.random.randint(2**32-1)
-        return (self.low, self.high, self.seed)
-    
-    def	augment(self, img):
-        self.low, self.high, self.seed = get_augment_params(img)
-        p_holder = np.array([0])
-        t = self.get_transform(p_holder).apply_image(img)
-        return t
-
-try:
-    Transform = imgaug.Transform
-except AttributeError:
-    Transform = imgaug.transform.Transform
-    
-class normalize_staining(Transform):
+class normalize_staining(imgaug.transform.ImageTransform):
     def __init__(self):
         super(normalize_staining, self).__init__()
         self._init(locals())
@@ -208,7 +176,7 @@ class normalize_staining(Transform):
     def apply_coords(self, coords):
         return coords
     
-class hematoxylin_eosin_aug(Transform):
+class hematoxylin_eosin_aug(imgaug.transform.ImageTransform):
     def __init__(self, low=0.7, high=1.3, seed=None):
         super(hematoxylin_eosin_aug, self).__init__()
         self.low = low
@@ -255,7 +223,7 @@ class hematoxylin_eosin_aug(Transform):
     def apply_coords(self, coords):
         return coords
 
-class zoom_transform(Transform):
+class zoom_transform(imgaug.transform.ImageTransform):
     def __init__(self, zoom, seed = None):
         super(zoom_transform, self).__init__()
         self.zoom = zoom

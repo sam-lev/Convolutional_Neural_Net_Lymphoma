@@ -4,7 +4,7 @@
 #SBATCH --mem=140G
 #SBATCH -o slurm-%j.out-%N # name of the stdout, using the job number (%j) and the first node (%N)        
 #SBATCH -e slurm-%j.err-%N # name of the stderr, using the job number (%j) and the first node (%N)
-#SBATCH --gres=gpu:8
+#SBATCH --gres=gpu:5
 
 import numpy as np
 import tensorflow as tf
@@ -81,7 +81,7 @@ def read_lymphoma(filenames,  train_or_test = 'train', original_dir=None):
         if train_or_test == 'test':
             multi_crop = 1
         else:
-            multi_crop = 2
+            multi_crop = 4
         for tile in range(multi_crop):
             if tile == 1:
                 part = min(len(data),10)
@@ -92,7 +92,7 @@ def read_lymphoma(filenames,  train_or_test = 'train', original_dir=None):
                 img = data[k]
                 cropsize = (np.max(np.array(img.shape)), np.max(np.array(img.shape)[np.array(img.shape) < np.max(np.array(img.shape))]), 3) 
                 scaleSize = 224,224
-                imSize = 672
+                imSize = 224*2
                 #randPos = rnd.choice([0, 50, 100, 200, 300])
                 #img = data[k][:, randPos:(randPos+imSize), randPos:(randPos+imSize)] #:32, :32] #size currently (927,1276,3)
                 
@@ -107,8 +107,8 @@ def read_lymphoma(filenames,  train_or_test = 'train', original_dir=None):
                 # make rgb feasible
                 img = np.transpose(img, [1, 2, 0])
                 
-                start_w = [100, 500][tile]
-                start_h = [100, 400][tile]
+                start_w = [100, 300, 400, 500][tile]
+                start_h = [100, 100, 100, 100][tile]
                 img = img[start_w:(start_w+imSize),start_h:(start_h+imSize),:]
 
                 #img = hematoxylin_eosin_aug(low = 0.7, high = 1.3).apply_image(img)

@@ -158,7 +158,7 @@ class Model(ModelDesc):
         self.cost = tf.add_n([cost, wd_cost], name='cost')
 
     def _get_optimizer(self):
-        lr = tf.get_variable('learning_rate', initializer=0.01, trainable=False)
+        lr = tf.get_variable('learning_rate', initializer=0.001, trainable=False)
         tf.summary.scalar('learning_rate', lr)
         return tf.train.AdamOptimizer(lr, beta1=0.88, beta2=0.999,epsilon=1e-08)#MomentumOptimizer(lr, 0.9, use_nesterov=True)
 
@@ -173,13 +173,14 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
        args.class_1 = ds.class_1
        
     #pp_mean = ds.get_per_pixel_mean()
+    np.random.seed(None)
     if isTrain:
        augmentors = [
           #and dividing by the standard deviation
           #imgaug.CenterPaste((224, 224)),
           ##datapack.NormStainAug(),
-          datapack.HematoEAug((0.2, 2.3, np.random.randint(2**32-1))),
-          datapack.NormStainAug(),
+          datapack.HematoEAug((0.2, 4.6, np.random.randint(2**32-1))),
+          #datapack.NormStainAug(),
           imgaug.Flip(horiz=True),
           ##ZoomAug(zoom=10,seed=None),
        ]
@@ -189,8 +190,8 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
         augmentors = [
             #imgaug.MapImage(lambda x: x - pp_mean),
             #imgaug.Brightness(20),
-            #imgaug.CenterPaste((224, 224)),
-            datapack.NormStainAug(),
+            imgaug.CenterPaste((224, 224)),
+            #datapack.NormStainAug(),
             #imgaug.MapImage(lambda x: x - pp_mean),
         ]
         augmentor = AugmentImageComponent(ds, augmentors)
@@ -214,11 +215,8 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
        #ds = PrefetchData(ds, nr_prefetch = args.batch_size * args.num_gpu, nr_proc=args.num_gpu)
        ds = MultiThreadMapData(ds,
                                nr_thread=args.batch_size * args.num_gpu,
-                               map_func=lambda dp: [augmentor._augment(dp[0],
-                                                                       param=((0.2, 2.3, np.random.randint(2**32-1)),
-                                                                              (0),
-                                                                              (True,False,0.5))),
-                                                    dp[1]],
+                               map_func=lambda dp: [augmentor._augment(dp[0], param=((0.2, 4.6, np.random.randint(2**32-1)),
+                                                                                     (True, False, 0.5))),dp[1]],
                                buffer_size=args.batch_size)
        ds = PrefetchDataZMQ(ds, nr_proc=1)#args.num_gpu)
        ds = BatchData(ds, batch_size, remainder=not isTrain)
