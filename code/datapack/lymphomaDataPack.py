@@ -11,7 +11,7 @@ import tensorflow as tf
 import argparse
 import os
 
-import six
+import six 
 from six.moves import range
 from abc import abstractmethod, ABCMeta
 import threading
