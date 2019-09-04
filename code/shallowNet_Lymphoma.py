@@ -57,6 +57,7 @@ python3 denseNet_Lymphoma.py --tot test --gpu 0,1 --batch_size 500 --model_name 
 class Model(ModelDesc):
     def __init__(self, depth, class_0, class_1):
         super(Model, self).__init__()
+        self.step = tf.train.get_or_create_global_step()
         self.N = int((depth - 4)  / 3)
         self.growthRate = 32
         if class_0 == class_1:
@@ -160,6 +161,10 @@ class Model(ModelDesc):
     def _get_optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=0.001, trainable=False)
         tf.summary.scalar('learning_rate', lr)
+        val_loss = tf.get_variable('validation_error')
+        tf.summary.scalar('validation_error', val_loss)
+        step = tf.train.global_step(self.sess, self.step)
+        tf.train.AdamOptimizer(lr).minimize(self.loss, global_step=self.step)
         return tf.train.AdamOptimizer(lr, beta1=0.88, beta2=0.999,epsilon=1e-08)#MomentumOptimizer(lr, 0.9, use_nesterov=True)
 
 
@@ -179,7 +184,7 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
           #and dividing by the standard deviation
           #imgaug.CenterPaste((224, 224)),
           ##datapack.NormStainAug(),
-          datapack.HematoEAug((0.2, 4.6, np.random.randint(2**32-1))),
+          datapack.HematoEAug((0.7, 1.3, np.random.randint(2**32-1))),
           #datapack.NormStainAug(),
           imgaug.Flip(horiz=True),
           ##ZoomAug(zoom=10,seed=None),
@@ -215,7 +220,7 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
        #ds = PrefetchData(ds, nr_prefetch = args.batch_size * args.num_gpu, nr_proc=args.num_gpu)
        ds = MultiThreadMapData(ds,
                                nr_thread=args.batch_size * args.num_gpu,
-                               map_func=lambda dp: [augmentor._augment(dp[0], param=((0.2, 4.6, np.random.randint(2**32-1)),
+                               map_func=lambda dp: [augmentor._augment(dp[0], param=((0.7, 1.3, np.random.randint(2**32-1)),
                                                                                      (True, False, 0.5))),dp[1]],
                                buffer_size=args.batch_size)
        ds = PrefetchDataZMQ(ds, nr_proc=1)#args.num_gpu)

@@ -85,7 +85,7 @@ class ZoomAug(imgaug.ImageAugmentor):
         return t
 
 class HematoEAug(imgaug.ImageAugmentor):
-    def __init__(self, param = (0.2, 2.3, None)):
+    def __init__(self, param = (0.7, 1.3, None)):
         super(HematoEAug, self).__init__()
         self.low = param[0]
         self.high = param[1]
