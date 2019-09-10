@@ -8,8 +8,8 @@ import os
 
 #         python storeData.py -dirbl data/BL/ -dirdl data/DlBCL/ -pout data/ -dirtest_bl data/BL_sub/ -dirtest_dlbcl data/DLBCL_sub/ -batch_name 0
 parser = argparse.ArgumentParser()
-parser.add_argument('-dirbl', type = str, help='BL train directory')
-parser.add_argument('-dirdl', type = str, help='DLBCL train directory')
+parser.add_argument('-dirbl', default=None, help='BL train directory')
+parser.add_argument('-dirdl', default=None, help='DLBCL train directory')
 parser.add_argument('-pout', type = str, help='Pickle output directory')
 parser.add_argument('-dirtest', type = str, help='Directory of test data')
 parser.add_argument('-dirtest_bl', type = str, help='Directory of test data')
@@ -25,7 +25,7 @@ dir_test_dlbcl = args.dirtest_dlbcl
 batch_name = args.batch_name
 pout = args.pout
 
-if dir_bl and dir_dlbcl:
+if dir_bl is not None or dir_dlbcl is not None:
     train_set = True
 else:
     train_set = False
@@ -56,18 +56,30 @@ def get_filenames():
 
     #train set
     if dir_bl:
-        filenames_bl = [os.path.join(dir_bl, f ) for f in os.listdir(dir_bl) if f.endswith('.jpg')]
+        print("using bl")
+        filenames_bl  = [os.path.join(dir_bl, f ) for f in os.listdir(dir_bl) if f.endswith('.jpg')]
         labels_bl = [0 for i in range(len(filenames_bl))]
-
+        if dir_dlbcl is None:
+            filenames = filenames_bl
+            labels_train = labels_bl
+        labels_bl_train = labels_bl
+        
+        
     if dir_dlbcl:
+        print("using dlbcl")
         filenames_dlbcl = [os.path.join(dir_dlbcl, f) for f in os.listdir(dir_dlbcl) if f.endswith('.jpg')]
         labels_dlbcl = [1 for i in range(len(filenames_dlbcl))]
-
+        if dir_bl is None:
+            filenames = filenames_dlbcl
+            labels_train = labels_dlbcl
+        labels_dl_train = labels_dlbcl
+        
+        
     if dir_bl and dir_dlbcl:
+        print("using both dlbcl and bl")
         labels_train =  labels_dlbcl + labels_bl 
         filenames =    filenames_dlbcl +filenames_bl 
-
-    #blackbox set
+    #    #blackbox set
     if dir_test:
         filenames_blackbox = [os.path.join(dir_test, f) for f in os.listdir(dir_test) if f.endswith('.jpg')]
         # assign label 1, i.e. dlbcl, for all testing data
