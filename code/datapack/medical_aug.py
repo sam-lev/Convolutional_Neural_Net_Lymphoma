@@ -2,7 +2,10 @@
 """Extract deep CNN features from a set of images and dump them as Numpy arrays image_file_name.npy"""
 
 from tensorpack.dataflow import imgaug
-
+try:
+    Transform = imgaug.transform.ImageTransform
+except AttributeError:
+    Transform = imgaug.Transform
 import argparse
 import numpy as np
 import cv2
@@ -12,6 +15,7 @@ from os import makedirs
 #from threaded_generator import threaded_generator
 from time import time
 import sys
+import copy as copy_dp
 
 #np.random.seed(101)
 
@@ -29,12 +33,18 @@ BATCH_SIZE = 16     # decrease if necessary
 
 NUM_CACHED = 160
 
+notification_norm = 0
+notification_he = 0
+notification_zoom = 0
+
 class NormStainAug(imgaug.ImageAugmentor):
     def __init__(self):
+        self.copy = True
         super(NormStainAug, self).__init__()
         self._init(locals())
         
     def reset_state(self):
+        self.copy = True
         super(NormStainAug, self).reset_state()
     
     def get_transform(self, _):
@@ -44,28 +54,38 @@ class NormStainAug(imgaug.ImageAugmentor):
         return coords
     
     def _get_augment_params(self, _):
-        return np.random.randint(100)
+        self.copy = True
+        return np.random.randint(2**32-1)
     
     def _augment(self, img, _):
         p_holder = np.array([0])
+        #img = copy_dp.copy(img)
+        copy_func = copy_dp.deepcopy if self.copy else lambda x: x
+        img = copy_func(img)
         t = self.get_transform(p_holder).apply_image(img)
         return t
     
-    #def reset_state(self):
-    #    super(NormStainAug, self).reset_state()
+    def augment(self, img):
+        p_holder = np.array([0])
+        copy_func = copy_dp.deepcopy if self.copy else lambda x: x
+        img = copy_func(img)
+        t = self.get_transform(p_holder).apply_image(img)
+        return t
             
 class ZoomAug(imgaug.ImageAugmentor):
     def __init__(self, param = (10, None)):
         super(ZoomAug, self).__init__()
-        self.zoom = zoom[0]
+        self.zoom = param[0]
         if param[1] is None:
             self.seed = np.random.randint(2**32-1)
         else:
             self.seed = seed[1]
+        self.copy = True
         self._init(locals())
         
     def	reset_state(self):
         super(ZoomAug, self).reset_state()
+        self.copy = True
         self.seed = np.random.randint(2**32-1)
         
     def get_transform(self, _):
@@ -75,13 +95,26 @@ class ZoomAug(imgaug.ImageAugmentor):
         return coords
     
     def _get_augment_params(self, _):
+        self.copy = True
         return (self.zoom, self.seed)
     
     def	_augment(self, img, param = (10, None)):
         self.zoom = param[0]
         self.seed = param[1]
+        self.copy = True
         p_holder = np.array([0])
-        t = self.get_transform(p_holder).apply_image(img)
+        #img = copy.copy(img)
+        copy_func = copy_dp.deepcopy if self.copy else lambda x: x
+        img_dup = copy_func(img)
+        t = self.get_transform(p_holder).apply_image(img_dup)
+        return t
+    
+    def	augment(self, img):
+        p_holder = np.array([0])
+        #img = copy.copy(img)
+        copy_func = copy_dp.deepcopy if self.copy else lambda x: x
+        img_dup = copy_func(img)
+        t = self.get_transform(p_holder).apply_image(img_dup)
         return t
 
 class HematoEAug(imgaug.ImageAugmentor):
@@ -90,11 +123,13 @@ class HematoEAug(imgaug.ImageAugmentor):
         self.low = param[0]
         self.high = param[1]
         self.seed = param[2]
+        self.copy = True
         self._init(locals())
         
     def	reset_state(self):
         super(HematoEAug, self).reset_state()
         self.seed = np.random.randint(2**32-1)
+        self.copy = True
     
     def get_transform(self, _):
         return hematoxylin_eosin_aug(self.low, self.high, self.seed)
@@ -104,6 +139,7 @@ class HematoEAug(imgaug.ImageAugmentor):
     
     def _get_augment_params(self, _):
         self.seed = np.random.randint(2**32-1)
+        self.copy = True
         return (self.low, self.high, self.seed)
     
     def	_augment(self, img, param = (0.7, 1.3, None)):
@@ -113,11 +149,22 @@ class HematoEAug(imgaug.ImageAugmentor):
             self.seed = np.random.randint(2**32-1)
         else:
             self.seed = param[2]
+        self.copy = True
         p_holder = np.array([0])
-        t = self.get_transform(p_holder).apply_image(img)
+        copy_func = copy_dp.deepcopy if self.copy else lambda x: x
+        img_dup = copy_func(img)
+        t = self.get_transform(p_holder).apply_image(img_dup)
         return t
 
-class normalize_staining(imgaug.transform.ImageTransform):
+    def augment(self, img):
+        p_holder = np.array([0])
+        #img = copy_dp.copy(img)
+        copy_func = copy.deepcopy if self.copy else lambda x: x
+        img_dup = copy_func(img) 
+        t = self.get_transform(p_holder).apply_image(img_dup)
+        return t
+    
+class normalize_staining(Transform):
     def __init__(self):
         super(normalize_staining, self).__init__()
         self._init(locals())
@@ -126,14 +173,16 @@ class normalize_staining(imgaug.transform.ImageTransform):
         
         """
         Adopted from "Classification of breast cancer histology images using Convolutional Neural Networks",
-        Teresa Araújo , Guilherme Aresta, Eduardo Castro, José Rouco, Paulo Aguiar, Catarina Eloy, António Polónia,
-        Aurélio Campilho. https://doi.org/10.1371/journal.pone.0177544
+        Teresa Araujo , Guilherme Aresta, Eduardo Castro, Jose Rouco, Paulo Aguiar, Catarina Eloy, Antonio Polonia,
+        Aurelio Campilho. https://doi.org/10.1371/journal.pone.0177544
         Performs staining normalization.
         # Arguments
         img: Numpy image array.
         # Returns
         Normalized Numpy image array.
         """
+        #if self.copy:
+        #    img_copy = copy.deepcopy(img)
         Io = 240
         beta = 0.15
         alpha = 1
@@ -176,9 +225,10 @@ class normalize_staining(imgaug.transform.ImageTransform):
     def apply_coords(self, coords):
         return coords
     
-class hematoxylin_eosin_aug(imgaug.transform.ImageTransform):
-    def __init__(self, low=0.7, high=1.3, seed=None):
+class hematoxylin_eosin_aug(Transform):
+    def __init__(self, low=0.7, high=1.3, seed=None, copy=True):
         super(hematoxylin_eosin_aug, self).__init__()
+        self.copy = copy
         self.low = low
         self.high = high
         self.seed = seed
@@ -188,6 +238,8 @@ class hematoxylin_eosin_aug(imgaug.transform.ImageTransform):
         low = self.low
         high = self.high
         seed = self.seed
+        #if self.copy:
+        #    img_copy = copy.deepcopy(img)
         """
         "Quantification of histochemical staining by color deconvolution"
         Arnout C. Ruifrok, Ph.D. and Dennis A. Johnston, Ph.D.
@@ -223,16 +275,19 @@ class hematoxylin_eosin_aug(imgaug.transform.ImageTransform):
     def apply_coords(self, coords):
         return coords
 
-class zoom_transform(imgaug.transform.ImageTransform):
-    def __init__(self, zoom, seed = None):
+class zoom_transform(Transform):
+    def __init__(self, zoom, seed = None, copy = True):
         super(zoom_transform, self).__init__()
         self.zoom = zoom
         self.seed = seed
+        self.copy = copy
         self._init(locals())
         
     def apply_image(self, img):
         zoom = self.zoom
         seed = self.seed
+        #if self.copy:
+        #    img_copy = copy.deepcopy(img)
         """Performs a random spatial zoom of a Numpy image array.
         # Arguments
         img: Numpy image array.
