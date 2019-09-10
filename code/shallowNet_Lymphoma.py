@@ -4,7 +4,7 @@
 #SBATCH --mem=120G
 #SBATCH -o model_shallow.out-%j # name of the stdout, using the job number (%j) and the first node (%N)
 #SBATCH -e model_shallow.err-%j # name of the stderr, using the job number (%j) and the first node (%N)
-#SBATCH --gres=gpu:5
+#SBATCH --gres=gpu:4
 
 import numpy as np
 import tensorflow as tf
@@ -21,7 +21,7 @@ from tensorpack.tfutils.symbolic_functions import *
 from tensorpack.tfutils.summary import *
 
 from PIL import Image
-
+import copy
 
 """ slurm gpu test 
 """
@@ -116,26 +116,26 @@ class Model(ModelDesc):
                 for i in range(self.N):
                     l = add_layer('dense_layer.{}'.format(i), l)
                 l = add_transition('transition1', l)
-
+            
             with tf.variable_scope('block2') as scope:
-
+            
                 for i in range(self.N):
                     l = add_layer('dense_layer.{}'.format(i), l)
                 l = add_transition('transition2', l)
-
+            
             with tf.variable_scope('block3') as scope:
-
+            
                 for i in range(self.N):
                     l = add_layer('dense_layer.{}'.format(i), l)
             l = BatchNorm('bnlast', l)
             l = tf.nn.relu(l)
             l = GlobalAvgPooling('gap', l)
             logits = FullyConnected('linear', l, out_dim=2, nl=tf.identity)
-
+            
             return logits
          
         logits = dense_net("dense_net") #map probabilities to real domain
-
+        
         prob = tf.nn.softmax(logits, name='output')  #a generalization of the logistic function that "squashes" a K-dim vector z  of arbitrary real values to a K-dim vector sigma( z ) of real values in the range [0, 1] that add up to 1.
         factorbl = (self.class_0+self.class_1)/(2.0*self.class_0)
         factordl = (self.class_0+self.class_1)/(2.0*self.class_1)
@@ -149,29 +149,30 @@ class Model(ModelDesc):
         add_moving_summary(tf.reduce_mean(wrong, name='train_error'))
 
         # weight decay on all W
-        wd_cost = tf.multiply(1e-4, regularize_cost('.*/W', tf.nn.l2_loss), name='wd_cost')
+        wd_cost = tf.multiply(1e-3, regularize_cost('.*/W', tf.nn.l2_loss), name='wd_cost')
         add_moving_summary(cost, wd_cost)
-
+        
         add_param_summary(('.*/W', ['histogram']))   # monitor W
-
-
+        
+        
         
         self.cost = tf.add_n([cost, wd_cost], name='cost')
 
     def _get_optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=0.001, trainable=False)
         tf.summary.scalar('learning_rate', lr)
-        val_loss = tf.get_variable('validation_error')
-        tf.summary.scalar('validation_error', val_loss)
-        step = tf.train.global_step(self.sess, self.step)
-        tf.train.AdamOptimizer(lr).minimize(self.loss, global_step=self.step)
+        #val_loss = tf.get_variable('validation_error')
+        #tf.summary.scalar('validation_error', val_loss)
+        #step = tf.train.global_step(self.sess, self.step)
+        #tf.train.AdamOptimizer(lr).minimize(self.loss, global_step=self.step)
         return tf.train.AdamOptimizer(lr, beta1=0.88, beta2=0.999,epsilon=1e-08)#MomentumOptimizer(lr, 0.9, use_nesterov=True)
 
 
-def get_data(train_or_test, unknown_dir = None, original_dir=None):
+def get_data(train_or_test, shuffle = None, multi_crop = None, crop_per_case = None, unknown_dir = None, original_dir=None):
     isTrain = train_or_test == 'train'
     isVal = train_or_test == 'val'
-    ds =  datapack.lymphoma2(train_or_test, dir = '../data', unknown_dir = unknown_dir,original_dir=original_dir)
+    
+    ds =  datapack.lymphoma2(train_or_test, multi_crop=multi_crop, crop_per_case = crop_per_case, shuffle = shuffle, dir = '../data', unknown_dir = unknown_dir,original_dir=original_dir)
 
     if train_or_test == 'train':
        args.class_0 = ds.class_0
@@ -184,8 +185,8 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
           #and dividing by the standard deviation
           #imgaug.CenterPaste((224, 224)),
           ##datapack.NormStainAug(),
-          datapack.HematoEAug((0.7, 1.3, np.random.randint(2**32-1))),
-          #datapack.NormStainAug(),
+          #datapack.HematoEAug((0.7, 1.3, np.random.randint(2**32-1))),
+          datapack.NormStainAug(),
           imgaug.Flip(horiz=True),
           ##ZoomAug(zoom=10,seed=None),
        ]
@@ -195,11 +196,11 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
         augmentors = [
             #imgaug.MapImage(lambda x: x - pp_mean),
             #imgaug.Brightness(20),
-            imgaug.CenterPaste((224, 224)),
-            #datapack.NormStainAug(),
+            #imgaug.CenterPaste((224, 224)),
+            datapack.NormStainAug(),
             #imgaug.MapImage(lambda x: x - pp_mean),
         ]
-        augmentor = AugmentImageComponent(ds, augmentors)
+        augmentor = ds#AugmentImageComponent(ds, augmentors)
    
     #augmentor_list = AugmentorList(augmentors)
     #augmentor = AugmentImageComponent(ds, augmentors)
@@ -220,13 +221,14 @@ def get_data(train_or_test, unknown_dir = None, original_dir=None):
        #ds = PrefetchData(ds, nr_prefetch = args.batch_size * args.num_gpu, nr_proc=args.num_gpu)
        ds = MultiThreadMapData(ds,
                                nr_thread=args.batch_size * args.num_gpu,
-                               map_func=lambda dp: [augmentor._augment(dp[0], param=((0.7, 1.3, np.random.randint(2**32-1)),
+                               map_func=lambda dp: [augmentor._augment(copy.deepcopy(dp[0]), param=((0.7, 1.3, np.random.randint(2**32-1)),
                                                                                      (True, False, 0.5))),dp[1]],
                                buffer_size=args.batch_size)
        ds = PrefetchDataZMQ(ds, nr_proc=1)#args.num_gpu)
        ds = BatchData(ds, batch_size, remainder=not isTrain)
     else:
-       ds = BatchData(augmentor, batch_size, remainder=not isTrain)
+       ds = MapData(ds, lambda dp: [datapack.NormStainAug()._augment(copy.deepcopy(dp[0]),param=(0)),dp[1]])
+       ds = BatchData(ds, batch_size, remainder=not isTrain)
     return ds
 
     
@@ -238,12 +240,12 @@ def get_config(train_or_test, train_config = None):
     # prepare dataset
     # dataflow structure [im, label] in parralel
     if isTrain:
-       dataset_train = get_data('train')
+       dataset_train = get_data('train', multi_crop=args.multi_crop, crop_per_case = args.crop_per_case, shuffle = False)
        steps_per_epoch = dataset_train.size() #20
-       dataset_val = get_data('val')
+       dataset_val = get_data('val', multi_crop=args.multi_crop, crop_per_case =args.crop_per_case, shuffle = False)
    
     # dense net
-    denseModel = Model(depth=args.depth, class_0 = args.class_0, class_1 = args.class_1) #Use designed graph above, inheret from ModelDesc
+    denseModel = Model(depth=args.depth, class_0 = args.class_0, class_1 = args.class_1)#drop_rate = drop_rate, train_or_test=isTrain) #Use designed graph above, inheret from ModelDesc
     # ! update here to build_graph() call bc _build_graph depricated
     
     if isTrain:
@@ -251,16 +253,15 @@ def get_config(train_or_test, train_config = None):
             dataflow=dataset_train,
             callbacks=[
                 ModelSaver(), # Record state graph at intervals during epochs
-                DataParallelInferenceRunner(input=dataset_val,
-                                            infs=[ScalarStats('cost'), ClassificationError()],
-                gpus=args.num_gpu), #Compare to validation set
-                ScheduledHyperParamSetter('learning_rate',
-                                          [(args.drop_0, args.lr_0), (args.drop_1, args.lr_1), (args.drop_2, args.lr_2)]) # denote current hyperparameters
+                InferenceRunner(input=dataset_val,
+                                infs=[ScalarStats('cost'), ClassificationError()]), #Compare to validation set
+               ScheduledHyperParamSetter('learning_rate',
+                                          [(args.drop_0, args.lr_0), (args.drop_1, args.lr_1), (args.drop_2, args.lr_2), (args.drop_3, args.lr_3)]) # denote current hyperparameters
             ],
             model=denseModel,
             session_creator = None,
             session_config = train_config,
-            steps_per_epoch=steps_per_epoch,
+            steps_per_epoch=dataset_train.size()/args.num_gpu,
             max_epoch=args.max_epoch,
         )
     else:
@@ -303,9 +304,11 @@ if __name__ == '__main__':
    parser.add_argument('--drop_0',default=1, help='Epoch to drop learning rate to lr_0.')
    parser.add_argument('--drop_1',default=80, help='Epoch to drop learning rate to lr_1.')
    parser.add_argument('--drop_2',default=150,help='Epoch to drop learning rate to lr_2.')
+   parser.add_argument('--drop_3',default=150,help='Epoch to drop learning rate to lr_3.')
    parser.add_argument('--lr_0',type=float, default=0.1,help='second learning rate')
    parser.add_argument('--lr_1',type=float, default=0.01, help='first learning rate')             
    parser.add_argument('--lr_2',type=float, default=0.001,help='second learning rate')
+   parser.add_argument('--lr_3',type=float, default=0.001,help='third learning rate')
    parser.add_argument('--batch_size',type=int, default=4,help='batch size')
    parser.add_argument('--depth',type=int, default=13, help='The depth of densenet')
    parser.add_argument('--max_epoch',type= int, default=256,help='max epoch')
@@ -319,6 +322,8 @@ if __name__ == '__main__':
    parser.add_argument('--mp',default=True,help="Whether or not to use parallel multiprocessing over or on GPU. 0 no, 1 yes. Default yes.")
    parser.add_argument('--class_0',type=int, default=0,help="number samples in class 0")
    parser.add_argument('--class_1',type=int, default=0,help="number samples in class 1")
+   parser.add_argument('--multi_crop',type=int, default=4,help="number, if any, of crops to take from crop_per_case images. Average of crop classifications used in application")
+   parser.add_argument('--crop_per_case',type=int, default=33,help="number, more than 1, of images from each case to multi_crop. Average of crop classifications used in application")
    args = parser.parse_args()
    
    BATCH_SIZE = args.batch_size
