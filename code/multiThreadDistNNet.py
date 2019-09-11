@@ -4,7 +4,7 @@
 #SBATCH --mem=120G
 #SBATCH -o model_shallow.out-%j # name of the stdout, using the job number (%j) and the first node (%N)
 #SBATCH -e model_shallow.err-%j # name of the stderr, using the job number (%j) and the first node (%N)
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:1
 
 import numpy as np
 import tensorflow as tf
@@ -24,8 +24,7 @@ from tensorpack.tfutils.sesscreate import NewSessionCreator
 
 #from tensorpack.dataflow import LocallyShuffleData
 
-import tensorpack.dataflow.parallel_map
-from tensorpack.dataflow import *
+#from tensorpack.dataflow import *
 import multiprocessing
 import copy
 
@@ -292,30 +291,27 @@ def get_data(train_or_test, shuffle = None, multi_crop = None, crop_per_case = N
          #imgaug.CenterPaste((224, 224)),
          ##datapack.NormStainAug(),
          ##datapack.HematoEAug((0.7, 1.3, np.random.randint(2**32-1), True)),
-         datapack.NormStainAug(),
-         imgaug.Flip(horiz=True),
+         datapack.NormStainAug(True),
+         imgaug.Flip(horiz=True)
          ##ZoomAug(zoom=10,seed=None),
       ]
       augmentor =  imgaug.AugmentorList(augmentors)
-      aug_map_func=lambda dp: [augmentor._augment(dp[0],
-                                              param=((0),
-                                                     (True, False, 0.5))),
-                           dp[1]]
+      aug_map_func=lambda dp: [augmentor.augment(dp[0]),dp[1]]
    else:
       augmentors = [
          #imgaug.MapImage(lambda x: x - pp_mean),
          #imgaug.Brightness(20),
          #imgaug.CenterPaste((224, 224)),
          ##datapack.HematoEAug((0.7, 1.3, np.random.randint(2**32-1), True)),
-         datapack.NormStainAug(),
+         datapack.NormStainAug(False)
          #imgaug.MapImage(lambda x: x - pp_mean),
       ]
-      augmentor = imgaug.AugmentorList(augmentors)
-      aug_map_func=lambda dp: [augmentor._augment(dp[0],
-                                              param=((0),
-                                                     (True, False, 0.5))),
-                           dp[1]]
-
+      augmentor = AugmentImageComponent(ds, augmentors, copy=True)
+      aug_map_func=lambda dp: [augmentor.augment(dp[0]),dp[1]]
+      #param=((0),
+      #(True, False, 0.5))),
+      #dp[1]]
+   
    augmentor.reset_state()
    
    print(">>>>>>> Data Set Size: ", ds.size())
@@ -349,7 +345,7 @@ def get_data(train_or_test, shuffle = None, multi_crop = None, crop_per_case = N
       return ds
    else:
       #ds = MapData(augmentor, aug_map_func)
-      return BatchData(ds, batch_size, remainder=not isTrain)
+      return BatchData(augmentor, batch_size, remainder=not isTrain)
 
 def get_config(train_or_test, train_config = None):
    isTrain = train_or_test == 'train'
