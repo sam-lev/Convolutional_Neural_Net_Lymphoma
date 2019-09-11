@@ -112,7 +112,7 @@ def read_lymphoma(filenames,  train_or_test = 'train', multi_crop = 0, crop_per_
             img = data[k]
             cropsize = (np.max(np.array(img.shape)), np.max(np.array(img.shape)[np.array(img.shape) < np.max(np.array(img.shape))]), 3) 
             scaleSize = 224,224
-            imSize = 224*2
+            imSize = 224
             #randPos = rnd.choice([0, 50, 100, 200, 300])
             #img = data[k][:, randPos:(randPos+imSize), randPos:(randPos+imSize)] #:32, :32] #size currently (927,1276,3)
             
@@ -126,27 +126,24 @@ def read_lymphoma(filenames,  train_or_test = 'train', multi_crop = 0, crop_per_
             
             # make rgb feasible
             img = np.transpose(img, [1, 2, 0])
-            #img_og = copy.deepcopy(img)
             
+            multi_crop_ = 1
             if crop_count < crop_per_case:
                 multi_crop_ = multi_crop
                 crop_count += 1
-            else:
-                multi_crop_ = 1
             for tile in range(multi_crop_):
                 if multi_crop_ != 1:
                     total_crops += 1
-                start_w = [100, 300, 400, 500][tile]
-                start_h = [100, 100, 100, 100][tile]
-
-                copy_func = copy.deepcopy if multi_crop_ != 1 else lambda x: x
-                #img_copy = copy_func(img)#read_data(fname)[0][k]
-                #img_copy = np.transpose(img_copy, [1, 2, 0])
-                img_crop = copy_func(img)[start_w:(start_w+imSize),start_h:(start_h+imSize),:]
+                start_w = [100, 300, 500, 700][tile]
+                start_h = [400, 400, 400, 400][tile]
                 
-                #img = hematoxylin_eosin_aug(low = 0.7, high = 1.3).apply_image(img)
-                img_crop = Image.fromarray(img_crop,'RGB')                              
-                img_crop = img_crop.resize(scaleSize, Image.ANTIALIAS)
+                copy_func = copy.deepcopy if multi_crop_ != 1 else lambda x: x
+                img_crop = copy_func(img)
+                img_crop = img_crop[start_w:(start_w+imSize),start_h:(start_h+imSize),:]
+                
+                img_crop = Image.fromarray(img_crop,'RGB')
+                if scaleSize[0] != imSize:
+                    img_crop = img_crop.resize(scaleSize, Image.ANTIALIAS)
                 
                 img_crop = np.asarray(img_crop).reshape((224,224,3))
                 #if train_or_test != 'train':
@@ -156,7 +153,7 @@ def read_lymphoma(filenames,  train_or_test = 'train', multi_crop = 0, crop_per_
                 else:
                     class_1 += 1
                     
-                ret.append([img_crop, label[k]])
+                ret.append([img_crop.astype(np.float), label[k]])
                 #img = copy.deepcopy(img_og)
                 
     print(">>>> Total crops observed: ", total_crops)

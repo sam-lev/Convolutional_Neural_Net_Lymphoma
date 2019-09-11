@@ -4,7 +4,7 @@
 #SBATCH --mem=120G
 #SBATCH -o model_shallow.out-%j # name of the stdout, using the job number (%j) and the first node (%N)
 #SBATCH -e model_shallow.err-%j # name of the stderr, using the job number (%j) and the first node (%N)
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:3
 
 import numpy as np
 import tensorflow as tf
@@ -120,8 +120,7 @@ class Model(ModelDesc):
             l = tf.nn.relu(l)
             l = Conv2D('conv1', l, in_channel, 1, stride=1, use_bias=False, nl=tf.nn.relu)
             l = AvgPooling('pool', l, 2)
-            #drop_out = tf.nn.dropout(l, keep_prob)
-            #l = tf.layers.dropout(l, rate = drop_rate, training=training)
+            l = tf.layers.dropout(l, rate = drop_rate, training=training)
          return l
       
       def dense_net(name):
@@ -291,11 +290,11 @@ def get_data(train_or_test, shuffle = None, multi_crop = None, crop_per_case = N
          #imgaug.CenterPaste((224, 224)),
          ##datapack.NormStainAug(),
          ##datapack.HematoEAug((0.7, 1.3, np.random.randint(2**32-1), True)),
+
          datapack.NormStainAug(True),
-         imgaug.Flip(horiz=True)
-         ##ZoomAug(zoom=10,seed=None),
-      ]
-      augmentor =  imgaug.AugmentorList(augmentors)
+         imgaug.Flip(horiz=True),
+         ]
+      augmentor = imgaug.AugmentorList(augmentors)
       aug_map_func=lambda dp: [augmentor.augment(dp[0]),dp[1]]
    else:
       augmentors = [
@@ -303,9 +302,8 @@ def get_data(train_or_test, shuffle = None, multi_crop = None, crop_per_case = N
          #imgaug.Brightness(20),
          #imgaug.CenterPaste((224, 224)),
          ##datapack.HematoEAug((0.7, 1.3, np.random.randint(2**32-1), True)),
-         datapack.NormStainAug(False)
-         #imgaug.MapImage(lambda x: x - pp_mean),
-      ]
+         datapack.NormStainAug(False),
+         ]
       augmentor = AugmentImageComponent(ds, augmentors, copy=True)
       aug_map_func=lambda dp: [augmentor.augment(dp[0]),dp[1]]
       #param=((0),
@@ -328,8 +326,8 @@ def get_data(train_or_test, shuffle = None, multi_crop = None, crop_per_case = N
       print(">>>>> Setting up MultiThread Data Flow...")
       ds = MultiProcessMapData(ds,
                                map_func = aug_map_func,
-                               nr_proc=args.num_gpu,#multiprocessing.cpu_count(),
-                               buffer_size=batch_size*args.num_gpu,
+                               nr_proc=25,#args.num_gpu,#multiprocessing.cpu_count(),
+                               buffer_size=batch_size*2*args.num_gpu,
                                strict=False)
                                #batch_size=batch_size) #args.num_gpu
       #ds = MultiThreadMapData(ds,1
@@ -451,8 +449,8 @@ if __name__ == '__main__':
    parser.add_argument('--mp',default=True,help="Whether or not to use parallel multiprocessing over or on GPU. 0 no, 1 yes. Default yes.")
    parser.add_argument('--class_0',type=int, default=0,help="number samples in class 0")
    parser.add_argument('--class_1',type=int, default=0,help="number samples in class 1")
-   parser.add_argument('--multi_crop',type=int, default=3,help="number, if any, of crops to take from crop_per_case images. Average of crop classifications used in application")
-   parser.add_argument('--crop_per_case',type=int, default=10,help="number, more than 1, of images from each case to multi_crop. Average of crop classifications used in application")
+   parser.add_argument('--multi_crop',type=int, default=4,help="number, if any, of crops to take from crop_per_case images. Average of crop classifications used in application")
+   parser.add_argument('--crop_per_case',type=int, default=30,help="number, more than 1, of images from each case to multi_crop. Average of crop classifications used in application")
    args = parser.parse_args()
    
    
