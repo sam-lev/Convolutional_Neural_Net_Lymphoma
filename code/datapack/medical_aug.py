@@ -194,19 +194,21 @@ class normalize_staining(Transform):
         img = img.reshape((-1,3))
         
         # calculate optical density
-        OD = -np.log((img.astype(np.float)+1)/Io)
+        OD = -np.log((img.astype(np.float)+1.)/Io)
         
         # remove transparent pixels
-        ODhat = OD[~np.any(OD<beta, axis=1)]
-        
+        #ODhat = OD[~np.any(OD<beta, axis=1)]
+        ODhat = OD[(OD >= beta).all(axis=1)]
         # compute eigenvectors
-        eigvals, eigvecs = np.linalg.eigh(np.cov(ODhat.T))
-        
+        eigvals, eigvecs = np.linalg.eig(np.cov(ODhat, rowvar=False))
+        #np.linalg.eigh(np.cov(ODhat.T))
+        eigvecs = -eigvecs.T[:2][::-1].T
         #eigvecs *= -1
         
         #project on the plane spanned by the eigenvectors corresponding to the two 
-        # largest eigenvalues    
-        That = ODhat.dot(eigvecs[:,1:3])
+        # largest eigenvalues
+        That = np.dot(ODhat, eigvecs)
+        #That = ODhat.dot(eigvecs[:,1:3])
         
         phi = np.arctan2(That[:,1],That[:,0])
         
