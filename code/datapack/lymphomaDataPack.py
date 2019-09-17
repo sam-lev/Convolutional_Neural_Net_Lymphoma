@@ -153,7 +153,7 @@ def read_lymphoma(filenames,  train_or_test = 'train', image_size = 448, scale_s
                 if multi_crop_ != 1:
                     total_crops += 1
                 start_w = [100, 300, 500, 700][tile] if multi_crop <= 4 else [100, 200, 300, 400, 500, 600][tile]
-                start_h = [400, 400, 400, 400][tile] if multi_crop <= 4	else [100, 200, 300, 400, 500, 600][tile]
+                start_h = [400, 400, 400, 400][tile] if multi_crop <= 4	else [400, 400, 400, 400, 400, 400][tile]
                 
                 copy_func = copy.deepcopy if multi_crop_ != 1 else lambda x: x
                 img_crop = copy.deepcopy(img_og)
