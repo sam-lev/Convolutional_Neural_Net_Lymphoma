@@ -39,7 +39,7 @@ notification_zoom = 0
 
 class NormStainAug(imgaug.ImageAugmentor):
     def __init__(self, param=True):
-        self.copy = True
+        self.copy = param
         super(NormStainAug, self).__init__()
         self._init(locals())
         
@@ -51,41 +51,44 @@ class NormStainAug(imgaug.ImageAugmentor):
     
     def apply_coords(self, coords):
         return coords
+
+    def _augment_return_params(self, img):
+        p_holder = np.array([0])
+        copy_func = copy_dp.deepcopy if self.copy else lambda x: x
+        img_dup = copy_func(img)#.astype("uint8"))
+        t = self.get_transform(p_holder).apply_image(img_dup)#[0])
+        return (t, self.copy)
     
     def _get_augment_params(self, img):
         return self.copy
     
     def _augment(self, img, prms):
         p_holder = np.array([0])
-        self.copy = True
+        self.copy = prms
         copy_func = copy_dp.deepcopy if self.copy else lambda x: x
-        img_dup = copy_func(img)
+        img_dup = copy_func(img.astype("uint8"))
         t = self.get_transform(p_holder).apply_image(img_dup)
         return t
     
     def augment(self, img):
         p_holder = np.array([0])
-        self.copy = True
         copy_func = copy_dp.deepcopy if self.copy else lambda x: x
-        img_dup = copy_func(img)
+        img_dup = copy_func(img.astype("uint8"))
         t = self.get_transform(p_holder).apply_image(img_dup)
         return t
-            
+
 class ZoomAug(imgaug.ImageAugmentor):
     def __init__(self, param = (10, None, True)):
         super(ZoomAug, self).__init__()
         self.zoom = param[0]
-        if param[1] is None:
-            self.seed = np.random.randint(2**32-1)
-        else:
-            self.seed = seed[1]
+        self.seed = param[1]# np.random.randint(2**32-1)
         self.copy = param[2]
         self._init(locals())
         
     def	reset_state(self):
         super(ZoomAug, self).reset_state()
         self.copy = self.copy
-        self.seed = np.random.randint(2**32-1)
+        self.seed = None#np.random.randint(2**32-1)
         
     def get_transform(self, _):
         return zoom_transform(self.zoom, self.seed)
@@ -102,16 +105,23 @@ class ZoomAug(imgaug.ImageAugmentor):
         self.copy = param[2]
         p_holder = np.array([0])
         copy_func = copy_dp.deepcopy if self.copy else lambda x: x
-        img_dup = copy_func(img.astype('float32'))
+        img_dup = copy_func(img.astype("uint8"))                             
         t = self.get_transform(p_holder).apply_image(img_dup)
         return t
     
     def	augment(self, img):
         p_holder = np.array([0])
         copy_func = copy_dp.deepcopy if self.copy else lambda x: x
-        img_dup = copy_func(img.astype('float32'))
+        img_dup = copy_func(img.astype("uint8"))
         t = self.get_transform(p_holder).apply_image(img_dup)
         return t
+    
+    def _augment_return_params(self, img):
+        p_holder = np.array([0])
+        copy_func = copy_dp.deepcopy if self.copy else lambda x: x
+        img_dup = copy_func(img.astype("uint8"))
+        t = self.get_transform(p_holder).apply_image(img_dup)
+        return t, (self.zoom, self.seed, self.copy)
 
 class HematoEAug(imgaug.ImageAugmentor):
     def __init__(self, param = (0.7, 1.3, None, True)):
@@ -124,7 +134,7 @@ class HematoEAug(imgaug.ImageAugmentor):
         
     def	reset_state(self):
         super(HematoEAug, self).reset_state()
-        self.seed = np.random.randint(2**32-1)
+        self.seed = None#np.random.randint(2**32-1)
     
     def get_transform(self, _):
         return hematoxylin_eosin_aug(self.low, self.high, self.seed)
@@ -133,33 +143,37 @@ class HematoEAug(imgaug.ImageAugmentor):
         return coords
     
     def _get_augment_params(self, img):
-        self.seed = np.random.randint(2**32-1)
         return (self.low, self.high, self.seed, self.copy)
     
     def	_augment(self, img, param = (0.7, 1.3, None, True)):
         self.low = param[0]
         self.high = param[1]
         self.copy = param[3]
-        if param[2] is None:
-            self.seed = np.random.randint(2**32-1)
-        else:
-            self.seed = param[2]
+        self.seed = param[2]
         p_holder = np.array([0])
         copy_func = copy_dp.deepcopy if self.copy else lambda x: x
-        img_dup = copy_func(img.astype('float32'))
+        img_dup = copy_func(img.astype("uint8"))
         t = self.get_transform(p_holder).apply_image(img_dup)
         return t
 
     def augment(self, img):
         p_holder = np.array([0])
         copy_func = copy_dp.deepcopy if self.copy else lambda x: x
-        img_dup = copy_func(img.astype('float32')) 
+        img_dup = copy_func(img.astype("uint8")) 
         t = self.get_transform(p_holder).apply_image(img_dup)
         return t
     
+    def _augment_return_params(self, img):
+        p_holder = np.array([0])
+        copy_func = copy_dp.deepcopy if self.copy else lambda x: x
+        img_dup = copy_func(img.astype("uint8"))
+        t = self.get_transform(p_holder).apply_image(img_dup)
+        return t, (self.low, self.high, self.seed, self.copy)
+
 class normalize_staining(imgaug.transform.ImageTransform):
-    def __init__(self):
+    def __init__(self, copy = True):
         super(normalize_staining, self).__init__()
+        self.copy = copy
         self._init(locals())
         
     def apply_image(self, img):
@@ -182,7 +196,7 @@ class normalize_staining(imgaug.transform.ImageTransform):
         """
         
         def implementation2():
-            Io = 240
+            Io = 240.
             alpha = 1
             beta=0.15
             
@@ -199,7 +213,7 @@ class normalize_staining(imgaug.transform.ImageTransform):
             img = img.reshape((-1,3))
             
             # calculate optical density
-            OD = -np.log((img.astype(np.float)+1.)/Io)
+            OD = -np.log((img.astype("uint8")+1.)/Io)
             
             # remove transparent pixels
             ODhat = OD[~np.any(OD<beta, axis=1)]
@@ -241,16 +255,16 @@ class normalize_staining(imgaug.transform.ImageTransform):
             # recreate the image using reference mixing matrix
             Inorm = np.multiply(Io, np.exp(-HERef.dot(C2)))
             Inorm[Inorm>255] = 254
-            Inorm = np.reshape(Inorm.T, (h, w, 3)).astype(np.uint8)  
+            Inorm = np.reshape(Inorm.T, (h, w, 3)).astype("uint8")  
             
             # unmix hematoxylin and eosin
             H = np.multiply(Io, np.exp(np.expand_dims(-HERef[:,0], axis=1).dot(np.expand_dims(C2[0,:], axis=0))))
             H[H>255] = 254
-            H = np.reshape(H.T, (h, w, 3)).astype(np.uint8)
+            H = np.reshape(H.T, (h, w, 3)).astype("uint8")
             
             E = np.multiply(Io, np.exp(np.expand_dims(-HERef[:,1], axis=1).dot(np.expand_dims(C2[1,:], axis=0))))
             E[E>255] = 254
-            E = np.reshape(E.T, (h, w, 3)).astype(np.uint8)
+            E = np.reshape(E.T, (h, w, 3)).astype("uint8")
             
             #if saveFile is not None:
             #    Image.fromarray(Inorm).save(saveFile+'.png')
@@ -268,7 +282,7 @@ class normalize_staining(imgaug.transform.ImageTransform):
         
         h, w, c = img.shape
         img = img.reshape(h * w, c)
-        OD = -np.log((img.astype("uint16") + 1.) / Io) #img.astype("uint16")
+        OD = -np.log((img.astype("uint8") + 1.) / Io) #img.astype("uint16")
         ODhat = OD[(OD >= beta).all(axis=1)]
         W, V = np.linalg.eig(np.cov(ODhat, rowvar=False))
         
@@ -298,10 +312,10 @@ class normalize_staining(imgaug.transform.ImageTransform):
         # unmix hematoxylin and eosin                                                                                      
         #H = np.multiply(Io, np.exp(np.expand_dims(-HERef[:,0], axis=1).dot(np.expand_dims(C2[0,:], axis=0))))         
         #H[H>255] = 254               
-        #H = np.reshape(H.T, (h, w, 3)).astype(np.uint8)                                         
+        #H = np.reshape(H.T, (h, w, 3)).astype("uint8")                                         
         #E = np.multiply(Io, np.exp(np.expand_dims(-HERef[:,1], axis=1).dot(np.expand_dims(C2[1,:], axis=0))))         
         #E[E>255] = 254                                                                                     
-        #E = np.reshape(E.T, (h, w, 3)).astype(np.uint8)
+        #E = np.reshape(E.T, (h, w, 3)).astype("uint8")
         return Inorm#, H, E
     
     def apply_coords(self, coords):
@@ -340,10 +354,10 @@ class hematoxylin_eosin_aug(imgaug.transform.ImageTransform):
         M = np.array([[0.65, 0.70, 0.29],
                       [0.07, 0.99, 0.11],
                       [0.27, 0.57, 0.78]])
-        Io = 240
+        Io = 240.
         
         h, w, c = img.shape
-        OD = -np.log10((img.astype("uint16") + 1) / Io)#.astype("uint16")
+        OD = -np.log10((img.astype("uint8") + 1.) / Io)#.astype("uint16")
         C = np.dot(D, OD.reshape(h * w, c).T).T
         r = np.ones(3)
         r[:2] = np.random.RandomState(seed).uniform(low=low, high=high, size=2)

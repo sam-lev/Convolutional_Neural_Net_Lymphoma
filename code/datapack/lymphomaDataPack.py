@@ -28,9 +28,7 @@ from tensorpack.tfutils.summary import *
 from tensorpack.utils.utils import get_rng
 
 from tensorpack.dataflow.base import RNGDataFlow
-#from lymphomaflow import DataFlow
-#from lymphomaflow import RNGDataFlow
-#RNGDataFlow = RNGDataFlow(DataFlow)
+
 from PIL import Image
 import cv2
 import copy
@@ -75,12 +73,13 @@ def read_data(filename):
         fo.close()
     return (data, label)
 
-def read_lymphoma(filenames,  train_or_test = 'train', multi_crop = 0, crop_per_case = None, original_dir=None):
+def read_lymphoma(filenames,  train_or_test = 'train', image_size = 448, scale_size = 224, scale = 2, multi_crop = 0, crop_per_case = None, original_dir=None):
     num_show=5
     ret = []
     class_0 = 0
     class_1 = 0
     total_crops = 0
+    unique_samples = 0
     for fname in filenames:
         
         with open(fname, 'rb') as fo:
@@ -93,8 +92,9 @@ def read_lymphoma(filenames,  train_or_test = 'train', multi_crop = 0, crop_per_
         data = dic['data']
         label = dic['labels']
         fo.close()
-
+        
         crop_count = 0
+        unique_samples += len(data)
         
         if crop_per_case is not None:
             crop_per_case = min(len(data), crop_per_case)
@@ -103,16 +103,20 @@ def read_lymphoma(filenames,  train_or_test = 'train', multi_crop = 0, crop_per_
         
         if bool(multi_crop) == False:
             multi_crop = 1
-
+        
         print(">>>>>> will take ", str(crop_per_case)," images from each case for ",str(multi_crop), " crops.")
         print(">>>>>> Totaling crops: ", str(crop_per_case*multi_crop))
-
+        
         for k in range(len(data)):#part):
             # resize to divisable format for convolutions
-            img = data[k]
-            cropsize = (np.max(np.array(img.shape)), np.max(np.array(img.shape)[np.array(img.shape) < np.max(np.array(img.shape))]), 3) 
-            scaleSize = 224,224
-            imSize = 224
+            img = data[k].astype("uint8")
+            cropsize = (np.max(np.array(img.shape)), np.max(np.array(img.shape)[np.array(img.shape) < np.max(np.array(img.shape))]), 3)
+            if scale_size is None:
+                scaleSize = image_size,image_size #224*scale,224*scale
+                imSize = image_size#image_size*scale #224
+            else:
+                scaleSize = image_size,image_size#scale_size,scale_size                             
+                imSize = image_size
             #randPos = rnd.choice([0, 50, 100, 200, 300])
             #img = data[k][:, randPos:(randPos+imSize), randPos:(randPos+imSize)] #:32, :32] #size currently (927,1276,3)
             
@@ -126,6 +130,20 @@ def read_lymphoma(filenames,  train_or_test = 'train', multi_crop = 0, crop_per_
             
             # make rgb feasible
             img = np.transpose(img, [1, 2, 0])
+            img_og = copy.deepcopy(img)
+            
+            #im_og = datapack.medical_aug.hematoxylin_eosin_aug(1.3, 1.4,8).apply_image(im_og)
+            #
+            #img_augment = normalize_staining().apply_image(img_og)
+            #img_aug = copy.deepcopy(img_augment)
+            
+            aspect_ratio = min( img.shape[1]/float(img.shape[0]) , img.shape[0]/float(img.shape[1]) )
+            acc_scaleSize = (int(scaleSize[0]*aspect_ratio),scaleSize[1]) if img.shape[0] < img.shape[1] else (scaleSize[0],int(aspect_ratio*scaleSize[1]))
+            W = int( imSize*img.shape[1]/float(img.shape[0]) )
+            H = int( imSize*img.shape[0]/float(img.shape[1]) )
+            
+            #print(" True size after scaling to preserve aspect ratio: ", scaleSize)
+            #print("larger crop size: ", W," ",H)
             
             multi_crop_ = 1
             if crop_count < crop_per_case:
@@ -138,26 +156,29 @@ def read_lymphoma(filenames,  train_or_test = 'train', multi_crop = 0, crop_per_
                 start_h = [400, 400, 400, 400][tile]
                 
                 copy_func = copy.deepcopy if multi_crop_ != 1 else lambda x: x
-                img_crop = copy_func(img)
-                img_crop = img_crop[start_w:(start_w+imSize),start_h:(start_h+imSize),:]
+                img_crop = copy.deepcopy(img_og)
+                
+                img_crop = img_crop[start_w:(start_w+2*image_size),start_h:(start_h+2*image_size),:]
+                
+                #img_stack = np.expand_dims( img_crop, axis=0)
                 
                 img_crop = Image.fromarray(img_crop,'RGB')
-                if scaleSize[0] != imSize:
-                    img_crop = img_crop.resize(scaleSize, Image.ANTIALIAS)
                 
-                img_crop = np.asarray(img_crop).reshape((224,224,3))
-                #if train_or_test != 'train':
-                #    img = normalize_staining().apply_image(img)
+                img_crop = img_crop.resize((image_size,image_size), Image.ANTIALIAS)
+                img_crop = np.array(img_crop)
+                img_crop= img_crop.reshape((image_size,image_size,3))#.transpose(0,3,1,2)
+                
+                # to place as nd array for tensorflow and augmentors
                 if label[k] == 0:
                     class_0 += 1
                 else:
                     class_1 += 1
                     
-                ret.append([img_crop.astype(np.float), label[k]])
+                ret.append([img_crop.astype("uint8"), label[k]])
                 #img = copy.deepcopy(img_og)
                 
     print(">>>> Total crops observed: ", total_crops)
-    return (ret, class_0, class_1)
+    return (ret, class_0, class_1, unique_samples)
 
 def get_filenames(dir, train_or_test, unknown_dir = None):
     filenames = []
@@ -185,7 +206,7 @@ class lymphomaBase( RNGDataFlow ):
     # yields [ Image, Label ]
     # image: 900x900x3 in range [0,255]
     # label: int either 0 or 1
-    def __init__(self, train_or_test, multi_crop=None, crop_per_case = None, shuffle=None, dir=None, lymphoma_num_classes=2,unknown_dir = None, original_dir=None):
+    def __init__(self, train_or_test, image_size = None, scale_size = None, scale = 2, multi_crop=None, crop_per_case = None, shuffle=None, dir=None, lymphoma_num_classes=2,unknown_dir = None, original_dir=None):
         assert train_or_test in ['train', 'test', 'val']
         assert lymphoma_num_classes == 2 or lymphoma_num_classes == 10
         self.lymphoma_num_classes = lymphoma_num_classes
@@ -215,13 +236,20 @@ class lymphomaBase( RNGDataFlow ):
                 raise ValueError('Failed to find file: ' + f)
 
         self.train_or_test = train_or_test
+
+        self.scale = scale
+
+        self.image_size = image_size
+        self.scale_size = scale_size
         
         print(">> reading in files.")
-        data = read_lymphoma(self.fs, train_or_test = self.train_or_test, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case, original_dir=original_dir) #different classes changes here ect..
+        data = read_lymphoma(self.fs, train_or_test = self.train_or_test, image_size = self.image_size, scale_size = self.scale_size, scale = self.scale, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case, original_dir=original_dir) #different classes changes here ect..
         
         self.data = data[0]
         self.class_0 = data[1]
         self.class_1 = data[2]
+        self.unique_samples = data[3]
+        
         print("")
         print(">>>> ", train_or_test," set >>>")
         print(">>> Total class 0 samples: ", self.class_0)
@@ -279,7 +307,7 @@ class lymphoma2(lymphomaBase):
     image is 900x900x3 in the range [0,255].
     label is an int.
     """
-    def __init__(self, train_or_test, multi_crop= None, crop_per_case = None, shuffle= None, dir=None, unknown_dir=None,original_dir=None):
+    def __init__(self, train_or_test, image_size = None, scale_size = None, scale = None, multi_crop= None, crop_per_case = None, shuffle= None, dir=None, unknown_dir=None,original_dir=None):
 
         """
         Args:
@@ -297,8 +325,12 @@ class lymphoma2(lymphomaBase):
         self.multi_crop = multi_crop
         
         self.crop_per_case = crop_per_case
+
+        self.scale = scale
+        self.image_size = image_size
+        self.scale_size = scale_size
         
-        super(lymphoma2, self).__init__(train_or_test, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case, shuffle = self.shuffle, dir=dir, lymphoma_num_classes = 2,unknown_dir = unknown_dir, original_dir = original_dir)
+        super(lymphoma2, self).__init__(train_or_test, image_size = self.image_size, scale_size = self.scale_size, scale=self.scale, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case, shuffle = self.shuffle, dir=dir, lymphoma_num_classes = 2,unknown_dir = unknown_dir, original_dir = original_dir)
 
 if __name__ == '__main__':
 
