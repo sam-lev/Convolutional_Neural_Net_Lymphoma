@@ -472,6 +472,7 @@ if __name__ == '__main__':
    parser.add_argument('--scale_lr',type= float,default=1.0,help="Scale learning rate factor (for distributed training)")
    parser.add_argument('--gpu_frac',type= float,default=0.99,help="Number GPU to use if not specificaly assigned")
    parser.add_argument('--mp',default=True,help="Whether or not to use parallel multiprocessing over or on GPU. 0 no, 1 yes. Default yes.")
+   parser.add_argument('--nccl',default=True,help="Whether NCCL available for DGX like machines.")
    parser.add_argument('--class_0',type=int, default=0,help="number samples in class 0")
    parser.add_argument('--class_1',type=int, default=0,help="number samples in class 1")
    parser.add_argument('--multi_crop',type=int, default=4,help="number, if any, of crops to take from crop_per_case images. Average of crop classifications used in application")
@@ -520,8 +521,8 @@ if __name__ == '__main__':
          nr_tower = len(args.gpu.split(','))
    
    config = get_config(args.tot, train_config=session_config)
-   #print(tf.test.is_gpu_available())                                          
-   #print(get_available_gpus())
+   print(tf.test.is_gpu_available())                                          
+   print(get_available_gpus())
 
    print("Net configured")
    
@@ -531,14 +532,17 @@ if __name__ == '__main__':
       config.session_init = SaverRestore(args.load)
    
    if args.tot == 'train':
-      if args.num_gpu == 1 and not args.mp:
+      if args.mp==0:
+         print("using simple trainer")
          launch_train_with_config(config, SimpleTrainer())
       else:
-         if args.gpu:
-            print(">>>> Using "+str(args.num_gpu)+" available GPU.")
-            launch_train_with_config(config, SyncMultiGPUTrainer(args.num_gpu))
+         print("can use simple (mp=0) trainer multi gpu parameter server or replicated")
+         print("for nccl as well as multiprocess distributed (mp=2) or multithreaded distributed (mp=else)")
+         if args.gpu or bool(args.nccl) == False:
+            print(">>>> Using "+str(args.num_gpu)+" available GPU parameter server.")
+            launch_train_with_config(config, SyncMultiGPUTrainerParameterServer(args.num_gpu))
          if args.num_gpu:
-            print(">>>> Using "+str(args.num_gpu)+" available GPU for replicated training.")
+            print(">>>> Using "+str(args.num_gpu)+" available GPU for replicated training (nccl).")
             launch_train_with_config(config, SyncMultiGPUTrainerReplicated(args.num_gpu))
    else:
       # retrieve unknown from /data/Unknown/unknown_dir   optional save data to original_dir (creates if d.n.e.)
