@@ -337,17 +337,18 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
       ##ds = PrefetchData(ds, nr_prefetch = args.batch_size * args.num_gpu, nr_proc=8)
       print(">>>>> Setting up MultiThread Data Flow...")
 
-      if args.mp == 2:
-         ds = MultiProcessMapDataZMQ(ds,
-                                     map_func=aug_map_func,
-                                     nr_proc=mp.cpu_count())
+      if args.mp == 2:#ZMQ?
+         ds = MultiProcessMapData(ds,
+                                  map_func=aug_map_func,
+                                  nr_proc=mp.cpu_count() if args.num_gpu > 1 else 1)
       else:
          ## Multithreaded
          ds = MultiThreadMapData(ds,
                                  nr_thread= args.num_gpu,
                                  map_func = aug_map_func,
                                  buffer_size=batch_size*args.num_gpu)
-         ds = PrefetchDataZMQ(ds, nr_proc = 1)
+
+      ds = PrefetchDataZMQ(ds, nr_proc = 1)
       
       ds = BatchData(ds, batch_size, remainder=not isTrain)
       print(">>> Done. |Data|/Batch Size = ", ds.size())
@@ -472,7 +473,7 @@ if __name__ == '__main__':
    parser.add_argument('--scale_lr',type= float,default=1.0,help="Scale learning rate factor (for distributed training)")
    parser.add_argument('--gpu_frac',type= float,default=0.99,help="Number GPU to use if not specificaly assigned")
    parser.add_argument('--mp',default=True,help="Whether or not to use parallel multiprocessing over or on GPU. 0 no, 1 yes. Default yes.")
-   parser.add_argument('--nccl',default=True,help="Whether NCCL available for DGX like machines.")
+   parser.add_argument('--nccl',type=int,default=0,help="Whether NCCL available for DGX like machines.")
    parser.add_argument('--class_0',type=int, default=0,help="number samples in class 0")
    parser.add_argument('--class_1',type=int, default=0,help="number samples in class 1")
    parser.add_argument('--multi_crop',type=int, default=4,help="number, if any, of crops to take from crop_per_case images. Average of crop classifications used in application")
@@ -532,16 +533,16 @@ if __name__ == '__main__':
       config.session_init = SaverRestore(args.load)
    
    if args.tot == 'train':
-      if args.mp==0:
+      if args.mp==0 or args.num_gpu == 1:
          print("using simple trainer")
          launch_train_with_config(config, SimpleTrainer())
       else:
          print("can use simple (mp=0) trainer multi gpu parameter server or replicated")
          print("for nccl as well as multiprocess distributed (mp=2) or multithreaded distributed (mp=else)")
-         if args.gpu or bool(args.nccl) == False:
+         if args.nccl == 0:
             print(">>>> Using "+str(args.num_gpu)+" available GPU parameter server.")
-            launch_train_with_config(config, SyncMultiGPUTrainerParameterServer(args.num_gpu))
-         if args.num_gpu:
+            launch_train_with_config(config, SyncMultiGPUTrainer(args.num_gpu))
+         elif args.num_gpu and args.nccl != 0:
             print(">>>> Using "+str(args.num_gpu)+" available GPU for replicated training (nccl).")
             launch_train_with_config(config, SyncMultiGPUTrainerReplicated(args.num_gpu))
    else:
