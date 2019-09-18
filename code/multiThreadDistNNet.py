@@ -4,7 +4,7 @@
 #SBATCH --mem=120G
 #SBATCH -o model_shallow.out-%j # name of the stdout, using the job number (%j) and the first node (%N)
 #SBATCH -e model_shallow.err-%j # name of the stderr, using the job number (%j) and the first node (%N)
-#SBATCH --gres=gpu:3
+#SBATCH --gres=gpu:1
 
 import numpy as np
 import tensorflow as tf
@@ -30,7 +30,7 @@ from tensorpack.tfutils.sesscreate import NewSessionCreator
 #from tensorpack.dataflow import LocallyShuffleData
 
 #from tensorpack.dataflow import *
-import multiprocessing
+import multiprocessing as mp
 import copy
 
 from PIL import Image
@@ -68,7 +68,7 @@ python3 denseNet_Lymphoma.py --tot test --gpu 0,1 --batch_size 500 --model_name 
 """
 
 class Model(ModelDesc):
-   def __init__(self, depth, image_size, lr_init, kernels, expansion, class_0, class_1, drop_rate, train_or_test):
+   def __init__(self, depth, image_size, lr_init, kernels, kernel_size, expansion, class_0, class_1, drop_rate, train_or_test):
       super(Model, self).__init__()
       self.step = tf.train.get_or_create_global_step()
       self.N = int((depth - 4)  / 3)
@@ -84,7 +84,8 @@ class Model(ModelDesc):
       else:
          self.class_0 = float(class_0)
          self.class_1 = float(class_1)
-      
+         
+      self.kernel_size = kernel_size
       print(">>> class 0: ", self.class_0)
       print(">>> class 1: ", self.class_1)
       
@@ -104,7 +105,7 @@ class Model(ModelDesc):
       def conv(name, l, channel, stride):
          #rand_seed = np.random.randint(2**32-1)
          #np.random.seed(None)
-         conv2d_xav = Conv2D(name, l, channel, 6, stride=stride,
+         conv2d_xav = Conv2D(name, l, channel, self.kernel_size, stride=stride,
                              nl=tf.identity, use_bias=False,
                              W_init = tf.contrib.layers.variance_scaling_initializer(factor=2.0, mode='FAN_AVG', uniform=False))
          #np.random.seed(rand_seed)
@@ -335,20 +336,18 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
       ##ds = BatchData(ds, batch_size, remainder=not isTrain)
       ##ds = PrefetchData(ds, nr_prefetch = args.batch_size * args.num_gpu, nr_proc=8)
       print(">>>>> Setting up MultiThread Data Flow...")
-      
-      ##ds = MultiProcessMapDataZMQ(ds,
-      ##                            map_func=aug_map_func,
-      ##                            nr_proc=args.num_gpu)
-      
-      ## Multithreaded
-      ds = MultiThreadMapData(ds,
-                              nr_thread= args.num_gpu,
-                              map_func = aug_map_func,
-                              buffer_size=batch_size*args.num_gpu)
-      
-      ##print(">>> Done. |Data| = ", ds.size())
-      
-      ds = PrefetchDataZMQ(ds, nr_proc = 1)
+
+      if args.mp == 2:
+         ds = MultiProcessMapDataZMQ(ds,
+                                     map_func=aug_map_func,
+                                     nr_proc=mp.cpu_count())
+      else:
+         ## Multithreaded
+         ds = MultiThreadMapData(ds,
+                                 nr_thread= args.num_gpu,
+                                 map_func = aug_map_func,
+                                 buffer_size=batch_size*args.num_gpu)
+         ds = PrefetchDataZMQ(ds, nr_proc = 1)
       
       ds = BatchData(ds, batch_size, remainder=not isTrain)
       print(">>> Done. |Data|/Batch Size = ", ds.size())
@@ -373,7 +372,7 @@ def get_config(train_or_test, train_config = None):
       print(">>>>>> Loading training and validation sets")
       dataset_train = get_data('train', image_size = args.image_size, scale_size = args.scale_size,  scale = args.scale, multi_crop=args.multi_crop, crop_per_case = args.crop_per_case, shuffle = False)
       
-      steps_per_epoch = dataset_train.size()/args.num_gpu # = |data|/(batch size * num gpu)
+      steps_per_epoch = dataset_train.size()/args.num_gpu if args.num_gpu > 1 else dataset_train.size()# = |data|/(batch size * num gpu)
       
       dataset_val = get_data('val', image_size = args.image_size, scale_size = args.scale_size, scale = args.scale, multi_crop=args.multi_crop, crop_per_case = args.crop_per_case, shuffle = False)
 
@@ -383,7 +382,7 @@ def get_config(train_or_test, train_config = None):
    print(" >>>>>>>>>> Steps Per Epoch: ", steps_per_epoch)
    print(">>>>>> Constructing Neural Network...")
    
-   denseModel = Model(depth=args.depth, image_size = args.scale_size, lr_init = args.lr_init, kernels = args.kernels, expansion=args.expansion, class_0 = args.class_0, class_1 = args.class_1, drop_rate = drop_rate, train_or_test=isTrain)
+   denseModel = Model(depth=args.depth, image_size = args.scale_size, lr_init = args.lr_init, kernels = args.kernels, kernel_size = args.kernel_size, expansion=args.expansion, class_0 = args.class_0, class_1 = args.class_1, drop_rate = drop_rate, train_or_test=isTrain)
    print(">>> Done.")
    
    if isTrain:
@@ -400,7 +399,7 @@ def get_config(train_or_test, train_config = None):
                                       [(args.drop_0, args.scale_lr*args.lr_0),
                                        (args.drop_1,  args.scale_lr*args.lr_1)]),
             HyperParamSetterWithFunc('learning_rate',
-                                     lambda e, x: x * 0.1 if e % 60 == 0 and e > args.drop_2 else x),# (1+e)/(2*20)
+                                     lambda e, x: x * 0.1 if e % 80 == 0 and e > args.drop_2 else x),# (1+e)/(2*20)
             #ScheduledHyperParamSetter('learning_rate',[(args.drop_0, args.scale_lr*args.lr_0), (args.drop_1,  args.scale_lr*args.lr_1), (args.drop_2,  args.scale_lr*args.lr_2), (args.drop_3,  args.scale_lr*args.lr_3)]), # denote current hyperparameters
             MergeAllSummaries()
          ],
@@ -448,7 +447,8 @@ if __name__ == '__main__':
    parser.add_argument('--model_name',type= str, default='MODEL',help="Name to prepend on model during training")
    parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.') 
    parser.add_argument('--load', help='load model')
-   parser.add_argument('--kernels',type=int, default=24, help='initial kernel size')
+   parser.add_argument('--kernels',type=int, default=24, help='initial kernel channel depth. Number kernels.')
+   parser.add_argument('--kernel_size',type=int, default=3, help='initial kernel window size')
    parser.add_argument('--expansion', type=int, default=12,help='expansion growth rate of kernels between layers per convolution')
    parser.add_argument('--drop_0',type=int, default=1, help='Epoch to drop learning rate to lr_0.')
    parser.add_argument('--drop_1',type=int, default=80, help='Epoch to drop learning rate to lr_1.')
@@ -495,8 +495,8 @@ if __name__ == '__main__':
       args.num_gpu = len(args.gpu.split(','))#max(get_num_gpu(),1)
       note = "Slurm assigns on DGX"
       print(" >>>> Hard assigning to all available gpu")
-      os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-      os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str,range(args.num_gpu)))#args.gpu
+      #os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+      #os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str,range(args.num_gpu)))#args.gpu
    
    if not args.tot:
       args.tot == 'train'
@@ -520,8 +520,8 @@ if __name__ == '__main__':
          nr_tower = len(args.gpu.split(','))
    
    config = get_config(args.tot, train_config=session_config)
-   print(tf.test.is_gpu_available())                                          
-   print(get_available_gpus())
+   #print(tf.test.is_gpu_available())                                          
+   #print(get_available_gpus())
 
    print("Net configured")
    
