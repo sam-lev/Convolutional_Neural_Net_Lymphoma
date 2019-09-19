@@ -173,6 +173,10 @@ def read_lymphoma(filenames,  train_or_test = 'train', image_size = 448, scale_s
                     class_0 += 1
                 else:
                     class_1 += 1
+
+                if label[k] != 0 or label[k] != 1:
+                    for i in range(20):
+                        print(" >>>>>>>>>>>>>> LABELING INCORRECT> VALUE: ",label[k])
                     
                 ret.append([img_crop.astype("uint8"), label[k]])
                 #img = copy.deepcopy(img_og)

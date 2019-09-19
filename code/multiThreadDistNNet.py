@@ -180,7 +180,7 @@ class Model(ModelDesc):
       add_moving_summary(tf.reduce_mean(wrong, name='train_error'))
       
       # weight decay on all W
-      wd_cost = tf.multiply(1e-4, regularize_cost('.*/W', tf.nn.l2_loss), name='wd_cost')
+      wd_cost = tf.multiply(1e-3, regularize_cost('.*/W', tf.nn.l2_loss), name='wd_cost')
       add_moving_summary(cost, wd_cost)
       
       add_param_summary(('.*/W', ['histogram']))   # monitor W
@@ -333,24 +333,29 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
       batch_size = args.batch_size
    
    if isTrain:
-      ##ds = BatchData(ds, batch_size, remainder=not isTrain)
-      ##ds = PrefetchData(ds, nr_prefetch = args.batch_size * args.num_gpu, nr_proc=8)
-      print(">>>>> Setting up MultiThread Data Flow...")
-
-      if args.mp == 2:#ZMQ?
+      if args.num_gpu == 1 or args.mp == 1:
+         print(">>>>>>>>>>>>>     multiprocess, no augmented process mapping mp = 1")
+         ds = AugmentImageComponent(ds, augmentors, copy=True) 
+         ds = BatchData(ds, batch_size, remainder=not isTrain)
+         ds = PrefetchData(ds, nr_prefetch = args.batch_size * 4, nr_proc=25)
+      elif args.mp == 2:
+         print(">>>>>>>>>>>>>     multiprocess mapping")
          ds = MultiProcessMapData(ds,
                                   map_func=aug_map_func,
-                                  nr_proc=mp.cpu_count() if args.num_gpu > 1 else 1)
+                                  nr_proc=mp.cpu_count()*args.num_gpu if args.num_gpu > 1 else 2)
+         ds = PrefetchDataZMQ(ds, nr_proc = 1)
+         ds = BatchData(ds, batch_size, remainder=not isTrain)
       else:
+         print(">>>>>>>>>>>>>     multithread mp=3")
          ## Multithreaded
          ds = MultiThreadMapData(ds,
-                                 nr_thread= args.num_gpu,
+                                 nr_thread= 25 if args.num_gpu > 1 else 2,
                                  map_func = aug_map_func,
-                                 buffer_size=batch_size*args.num_gpu)
-
-      ds = PrefetchDataZMQ(ds, nr_proc = 1)
-      
-      ds = BatchData(ds, batch_size, remainder=not isTrain)
+                                 buffer_size=batch_size*args.num_gpu if args.num_gpu > 1 else batch_size*2)
+         
+         ds = PrefetchDataZMQ(ds, nr_proc = 1)
+         
+         ds = BatchData(ds, batch_size, remainder=not isTrain)
       print(">>> Done. |Data|/Batch Size = ", ds.size())
       return ds
    else:
@@ -373,11 +378,11 @@ def get_config(train_or_test, train_config = None):
       print(">>>>>> Loading training and validation sets")
       dataset_train = get_data('train', image_size = args.image_size, scale_size = args.scale_size,  scale = args.scale, multi_crop=args.multi_crop, crop_per_case = args.crop_per_case, shuffle = False)
       
-      steps_per_epoch = dataset_train.size()/args.num_gpu if args.num_gpu > 1 else dataset_train.size()# = |data|/(batch size * num gpu)
+      steps_per_epoch = dataset_train.size()/args.num_gpu #if args.num_gpu > 1 else dataset_train.size()/2# = |data|/(batch size * num gpu)
       
       dataset_val = get_data('val', image_size = args.image_size, scale_size = args.scale_size, scale = args.scale, multi_crop=args.multi_crop, crop_per_case = args.crop_per_case, shuffle = False)
 
-      drop_rate = 0.4
+      drop_rate = args.drop_out if args.drop_out is not None else 0.0
       # dense net
    
    print(" >>>>>>>>>> Steps Per Epoch: ", steps_per_epoch)
@@ -400,7 +405,7 @@ def get_config(train_or_test, train_config = None):
                                       [(args.drop_0, args.scale_lr*args.lr_0),
                                        (args.drop_1,  args.scale_lr*args.lr_1)]),
             HyperParamSetterWithFunc('learning_rate',
-                                     lambda e, x: x * 0.1 if e % 80 == 0 and e > args.drop_2 else x),# (1+e)/(2*20)
+                                     lambda e, x: x * 0.1 if e % 200 == 0 and e > args.drop_2 else x),# (1+e)/(2*20)
             #ScheduledHyperParamSetter('learning_rate',[(args.drop_0, args.scale_lr*args.lr_0), (args.drop_1,  args.scale_lr*args.lr_1), (args.drop_2,  args.scale_lr*args.lr_2), (args.drop_3,  args.scale_lr*args.lr_3)]), # denote current hyperparameters
             MergeAllSummaries()
          ],
@@ -463,6 +468,7 @@ if __name__ == '__main__':
    parser.add_argument('--class_weights',type=str,help='comma seperated class weights e.g. class 0, class 1')
    parser.add_argument('--batch_size',type=int, default=4,help='batch size')
    parser.add_argument('--depth',type=int, default=13, help='The depth of densenet')
+   parser.add_argument('--drop_out',type=float, help='drop out rate')
    parser.add_argument('--max_epoch',type= int, default=256,help='max epoch')
    parser.add_argument('--tot',type= str, default='train',help=" 'train' or 'test'")
    parser.add_argument('--out_dir',type= str, default='../data/Unknowns/predictions/',help="img out dir")
@@ -533,7 +539,7 @@ if __name__ == '__main__':
       config.session_init = SaverRestore(args.load)
    
    if args.tot == 'train':
-      if args.mp==0 or args.num_gpu == 1:
+      if args.mp==0:
          print("using simple trainer")
          launch_train_with_config(config, SimpleTrainer())
       else:
