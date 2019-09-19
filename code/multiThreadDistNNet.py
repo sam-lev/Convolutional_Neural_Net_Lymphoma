@@ -107,7 +107,7 @@ class Model(ModelDesc):
          #np.random.seed(None)
          conv2d_xav = Conv2D(name, l, channel, self.kernel_size, stride=stride,
                              nl=tf.identity, use_bias=False,
-                             W_init = tf.contrib.layers.variance_scaling_initializer(factor=2.0, mode='FAN_AVG', uniform=False))
+                             W_init = tf.random_normal_initializer(stddev=np.sqrt(2.0/9/channel)))#tf.contrib.layers.variance_scaling_initializer(factor=2.0, mode='FAN_AVG', uniform=False))
          #np.random.seed(rand_seed)
          return conv2d_xav
       
@@ -180,7 +180,7 @@ class Model(ModelDesc):
       add_moving_summary(tf.reduce_mean(wrong, name='train_error'))
       
       # weight decay on all W
-      wd_cost = tf.multiply(1e-3, regularize_cost('.*/W', tf.nn.l2_loss), name='wd_cost')
+      wd_cost = tf.multiply(1e-6, regularize_cost('.*/W', tf.nn.l2_loss), name='wd_cost')
       add_moving_summary(cost, wd_cost)
       
       add_param_summary(('.*/W', ['histogram']))   # monitor W
@@ -274,7 +274,7 @@ class Model(ModelDesc):
    def _get_optimizer(self):
       lr = tf.get_variable('learning_rate', initializer=self.lr_init, trainable=False)
       tf.summary.scalar('learning_rate', lr)
-      return tf.train.AdamOptimizer(lr, beta1=0.9, beta2=0.999,epsilon=1e-08)#MomentumOptimizer(lr, 0.9, use_nesterov=True)
+      return tf.train.MomentumOptimizer(lr, 0.9, use_nesterov=True)#AdamOptimizer(lr, beta1=0.9, beta2=0.999,epsilon=1e-08)#MomentumOptimizer(lr, 0.9, use_nesterov=True)
    
    non_depricated="""def optimizer(self):
    lr = tf.get_variable('learning_rate', initializer=0.001, trainable=False)
@@ -337,7 +337,7 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
          print(">>>>>>>>>>>>>     multiprocess, no augmented process mapping mp = 1")
          ds = AugmentImageComponent(ds, augmentors, copy=True) 
          ds = BatchData(ds, batch_size, remainder=not isTrain)
-         ds = PrefetchData(ds, nr_prefetch = args.batch_size * 4, nr_proc=25)
+         #ds = PrefetchData(ds,  nr_prefetch=batch_size*4, nr_proc=3)#nr_prefetch
       elif args.mp == 2:
          print(">>>>>>>>>>>>>     multiprocess mapping")
          ds = MultiProcessMapData(ds,
@@ -405,7 +405,7 @@ def get_config(train_or_test, train_config = None):
                                       [(args.drop_0, args.scale_lr*args.lr_0),
                                        (args.drop_1,  args.scale_lr*args.lr_1)]),
             HyperParamSetterWithFunc('learning_rate',
-                                     lambda e, x: x * 0.1 if e % 200 == 0 and e > args.drop_2 else x),# (1+e)/(2*20)
+                                     lambda e, x: x * float(0.1) if e % 200 == 0 and e > args.drop_2 else x),# (1+e)/(2*20)
             #ScheduledHyperParamSetter('learning_rate',[(args.drop_0, args.scale_lr*args.lr_0), (args.drop_1,  args.scale_lr*args.lr_1), (args.drop_2,  args.scale_lr*args.lr_2), (args.drop_3,  args.scale_lr*args.lr_3)]), # denote current hyperparameters
             MergeAllSummaries()
          ],
