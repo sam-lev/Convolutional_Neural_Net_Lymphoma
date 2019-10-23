@@ -1,31 +1,29 @@
-#!/home/sci/samlev/bin/bin/python3.5
+#!/home/sci/samlev/anaconda3/envs/tf2/bin/python3.5
 
-#SBATCH --time=21-00:00:00 # walltime, abbreviated by -t
-#SBATCH --mem=120G
+#SBATCH --time=41:06:66 # walltime, abbreviated by -t
+#SBATCH --mem=110G
+#SBATCH --job-name="shmerp"
 #SBATCH -o model_shallow.out-%j # name of the stdout, using the job number (%j) and the first node (%N)
 #SBATCH -e model_shallow.err-%j # name of the stderr, using the job number (%j) and the first node (%N)
 #SBATCH --gres=gpu:1
 
-import numpy as np
-import tensorflow as tf
 import argparse
 import os
 import sys
 
-import sklearn.metrics
-import matplotlib.pyplot as plt
+#import sklearn.metrics
 import io
-import itertools
 
 # Personal Data Flow
 sys.path.append(os.getcwd())
 import datapack 
 
 from tensorpack import *
+from tensorpack.models import BatchNorm
 from tensorpack.tfutils.symbolic_functions import *
 from tensorpack.tfutils.summary import *
+from tensorpack.tfutils.tower import get_current_tower_context
 #from tensorpack.tfutils.symbolic_functions import prediction_incorrect
-from tensorpack.tfutils.sesscreate import NewSessionCreator
 
 #from tensorpack.dataflow import LocallyShuffleData
 
@@ -35,6 +33,9 @@ import copy
 
 from PIL import Image
 
+import numpy as np
+
+import tensorflow as tf
 
 """ slurm gpu test 
 """
@@ -68,30 +69,53 @@ python3 denseNet_Lymphoma.py --tot test --gpu 0,1 --batch_size 500 --model_name 
 """
 
 class Model(ModelDesc):
-   def __init__(self, depth, image_size, lr_init, kernels, kernel_size, expansion, class_0, class_1, drop_rate, train_or_test):
+   def __init__(self, depth, image_size, lr_init, kernels, kernel_size, expansion, class_0, class_1, drop_rate, drop_pattern, train_or_test):
       super(Model, self).__init__()
       self.step = tf.train.get_or_create_global_step()
       self.N = int((depth - 4)  / 3)
       self.image_size = image_size
-      self.growthRate = expansion
+      
+      self.growthRate = expansion 
       self.filters_init = kernels
-      self.lr_init = lr_init
-      self.drop_rate = drop_rate
+      
+      self.lr_init = tf.get_variable("lr_init", initializer = lr_init)
+      
+      graph = None
+      self.drop_rate = None
+      self.drop_pattern = None
       self.train_or_test= train_or_test
-      if class_0 == class_1:
-         self.class_0 = 1.0
-         self.class_1 = 1.0
-      else:
-         self.class_0 = float(class_0)
-         self.class_1 = float(class_1)
+      self.class_0 = None
+      self.class_1 = None
+
+      print("traing or test:" , self.train_or_test)
+      print("drop ", self.drop_rate)
+      
+      if train_or_test==True:
+         with tf.variable_scope('test_param') as scope:
+            dr = 1.0-drop_rate
+            self.drop_rate = 1.0-drop_rate #tf.get_variable("drop_rate", initializer=dr)#, dtype=tf.float32)        
+            self.train_or_test= True#tf.get_variable("is_train",initializer=train_or_test)
+            if class_0 == class_1:
+               self.class_0 = 1.0#tf.get_variable("class_0",initializer=1.0)#, dtype=tf.float32) 
+               self.class_1 = 1.0#tf.get_variable("class_1", initializer=1.0)#, dtype=tf.float32) 
+            else:
+               self.class_0 = class_0#tf.get_variable("class_0", initializer=class_0)#, dtype=tf.float32) 
+               self.class_1 = class_1#tf.get_variable("class_1",initializer=class_1)#, dtype=tf.float32) 
+         self.drop_pattern = drop_pattern
+      else:                                                                           
+         self.drop_rate = 1.0#tf.get_variable('drop_rate', initializer=1.0)                                  
+         self.train_or_test = False #tf.get_variable('is_training', initializer=False)                         
+         self.class_0 = 1.0#tf.get_variable('class_0', initializer=1.0)                                                            
+         self.class_1 = 1.0#tf.get_variable('class_1', initializer=1.0)
+         self.drop_pattern = 0#self.N*3
          
-      self.kernel_size = kernel_size
-      print(">>> class 0: ", self.class_0)
-      print(">>> class 1: ", self.class_1)
+      self.kernel_size = kernel_size 
+      
+      self.weight_decay_rate = 1e-4
       
    def _get_inputs(self):
       return [InputDesc(tf.float32, [None, self.image_size, self.image_size, 3], 'input'),
-              InputDesc(tf.int32, [None], 'label')
+              InputDesc(tf.int32, [None], 'label') 
       ]
    
    nondep = """def inputs(self):
@@ -100,58 +124,80 @@ class Model(ModelDesc):
    def _build_graph(self, input_vars):
       image, label = input_vars
       image = tf.image.convert_image_dtype(image, dtype = tf.float32)
+      ctx = get_current_tower_context()
+      print("train or test tower context?", ctx.is_training)
       
-      tf.summary.image("Input Image", image[0:2], max_outputs=2)#.astype("uint8"))
-      def conv(name, l, channel, stride):
+      tf.summary.image("Input Image", image[0:20], max_outputs=20)#.astype("uint8"))
+
+      def conv(name, l, channel, stride, kernel_size):
          #rand_seed = np.random.randint(2**32-1)
          #np.random.seed(None)
-         conv2d_xav = Conv2D(name, l, channel, self.kernel_size, stride=stride,
-                             nl=tf.identity, use_bias=False,
-                             W_init = tf.random_normal_initializer(stddev=np.sqrt(2.0/9/channel)))#tf.contrib.layers.variance_scaling_initializer(factor=2.0, mode='FAN_AVG', uniform=False))
+         conv2d_he = Conv2D(name, l, channel, kernel_size, stride=stride,nl=tf.identity, use_bias=False,
+                            W_init = tf.variance_scaling_initializer(dtype=tf.float32))
+         #tf.random_normal_initializer(stddev=np.sqrt(2.0/9/channel)))#tf.contrib.layers.variance_scaling_initializer(factor=2.0, mode='FAN_AVG', uniform=False))
          #np.random.seed(rand_seed)
-         return conv2d_xav
+         return conv2d_he
       
-      def add_layer(name, l):
+      def batch_norm(scope, name, layer, decay, layer_num, norm_pattern, training):
+         with tf.variable_scope(scope) as s:
+            if training:
+               layer = BatchNorm(name, layer) if layer_num%norm_pattern == 0 else layer
+            else:
+               layer = BatchNorm(name, l, decay=decay, use_local_stat=False) if layer_num%norm_pattern == 0 else layer
+         return layer
+      
+      def add_layer(name, l, kernel_size, growth_rate, drop_rate, training, layer_num, drop_pattern):
          shape = l.get_shape().as_list()
-         in_channel = shape[3]
+         in_channel = shape[3] 
          with tf.variable_scope(name) as scope:
-            c = BatchNorm('bn1', l)
+            # layer num mod 1 for bnorm every layer
+            c = batch_norm(name, 'bn.{}'.format(layer_num), l, 0.99, layer_num, 1, training)
             c = tf.nn.relu(c)
-            c = conv('conv1', c, self.growthRate, 1)
+            c = conv('conv1', c, growth_rate, 1, kernel_size)
             l = tf.concat([c, l], 3)
+            if drop_pattern!=0 and layer_num%drop_pattern == 0:
+               spatial_drop = tf.shape(l)
+               # drop every layer mod drop_pattern, drop_pattern == 0 if no drop wanted
+               l = tf.cond(tf.equal(tf.constant(training), tf.constant(True)), lambda: tf.nn.dropout(l, keep_prob = tf.constant(drop_rate),noise_shape=[spatial_drop[0], 1, 1, spatial_drop[3]], name='dropblock'), lambda: l)
          return l
       
-      def add_transition(name, l, drop_rate, training):
+      def add_transition(name, l, drop_rate, training, drop_pattern, transition_number):
          shape = l.get_shape().as_list()
          in_channel = shape[3]
          with tf.variable_scope(name) as scope:
-            l = BatchNorm('bn1', l)
+            l = batch_norm(name, 'bntransit.{}'.format(transition_number), l, 0.99, 42, 1, training)
             l = tf.nn.relu(l)
             l = Conv2D('conv1', l, in_channel, 1, stride=1, use_bias=False, nl=tf.nn.relu)
+            if drop_pattern!=0:
+               l = tf.cond(tf.equal(tf.constant(training), tf.constant(True)), lambda: tf.nn.dropout(l, keep_prob = tf.constant(drop_rate), name='droptransition'), lambda: l)
             l = AvgPooling('pool', l, 2)
-            l = tf.layers.dropout(l, rate = drop_rate, training=training)
          return l
       
       def dense_net(name):
-         l = conv('conv0',image,  self.filters_init , 1)
+
+         l = conv('conv0',image, self.filters_init , 1, self.kernel_size)
          
-         #tf.summary.image("Convolutional Image", l[0,:,:,0:1])#[0,:,:,:])
          with tf.variable_scope('block1') as scope:
-            
             for i in range(self.N):
-               l = add_layer('dense_layer.{}'.format(i), l)
-            l = add_transition('transition1', l ,self.drop_rate, self.train_or_test)
+               #(name, l, kernel_size, growth_rate, drop_rate, training, layer_num, drop_pattern):
+               l = add_layer(name='dense_layer.{}'.format(i), l=l, kernel_size=self.kernel_size,
+                             growth_rate=self.growthRate, drop_rate=self.drop_rate,
+                             training=self.train_or_test, layer_num=i, drop_pattern=0)
+            l = add_transition(name='transition1', l=l , drop_rate=self.drop_rate,
+                               training=self.train_or_test, drop_pattern=self.drop_pattern, transition_number=1)
             
          with tf.variable_scope('block2') as scope:
             for i in range(self.N):
-               l = add_layer('dense_layer.{}'.format(i), l)
-            l = add_transition('transition2', l, self.drop_rate, self.train_or_test)
+               l = add_layer('dense_layer.{}'.format(i), l, self.kernel_size, self.growthRate,
+                             self.drop_rate, self.train_or_test, i, self.drop_pattern)
+            l = add_transition('transition2', l, self.drop_rate, self.train_or_test, self.drop_pattern, 2)
          
          with tf.variable_scope('block3') as scope:
-            
             for i in range(self.N):
-               l = add_layer('dense_layer.{}'.format(i), l)
-         l = BatchNorm('bnlast', l)
+               l = add_layer('dense_layer.{}'.format(i), l, self.kernel_size, self.growthRate,
+                             self.drop_rate, self.train_or_test, i,  self.drop_pattern)
+         
+         l = batch_norm(name, 'bnlast', l, 0.99, 42, 1, self.train_or_test)
          l = tf.nn.relu(l)
          l = GlobalAvgPooling('gap', l)
          logits = FullyConnected('linear', l, out_dim=2, nl=tf.identity)
@@ -166,21 +212,22 @@ class Model(ModelDesc):
       logits = dense_net("dense_net") #map probabilities to real domain
       
       prob = tf.nn.softmax(logits, name='output')  #a generalization of the logistic function that "squashes" a K-dim vector z  of arbitrary real values to a K-dim vector sigma( z ) of real values in the range [0, 1] that add up to 1.
-      factorbl = (self.class_0+self.class_1)/(2.0*self.class_0)
-      factordl = (self.class_0+self.class_1)/(2.0*self.class_1)
-      class_weights = tf.constant([factorbl, factordl])#factor,(1-factor)])#factor, 1.0-factor]) #dl 730 bl 1576
-      weights = tf.gather(class_weights, label)
+      factorbl = tf.divide(tf.add(self.class_0, self.class_1), tf.multiply(tf.constant(2.0,dtype=tf.float32), self.class_0))
+      factordl = tf.divide(tf.add(self.class_0, self.class_1), tf.multiply(tf.constant(2.0,dtype=tf.float32), self.class_1))
+      #class_weights = tf.constant([factorbl, factordl])#factor,(1-factor)])#factor, 1.0-factor]) #dl 730 bl 1576
+      #weights = tf.gather(class_weights, label)
       
-      cost = tf.losses.sparse_softmax_cross_entropy(label, logits, weights=weights) #False positive 3* False negatives so adjust weight by factor
+      cost = tf.losses.sparse_softmax_cross_entropy(label, logits)#, weights=weights) #False positive 3* False negatives so adjust weight by factor
       cost = tf.reduce_mean(cost, name='cross_entropy_loss') #normalize
       
       wrong = prediction_incorrect(logits, label)
-
+      
       # monitor training error
       add_moving_summary(tf.reduce_mean(wrong, name='train_error'))
       
       # weight decay on all W
-      wd_cost = tf.multiply(1e-6, regularize_cost('.*/W', tf.nn.l2_loss), name='wd_cost')
+      wd_reg = tf.constant(self.weight_decay_rate, dtype=tf.float32)
+      wd_cost = tf.multiply(wd_reg, regularize_cost('.*/W', tf.nn.l2_loss), name='wd_cost')
       add_moving_summary(cost, wd_cost)
       
       add_param_summary(('.*/W', ['histogram']))   # monitor W
@@ -274,54 +321,91 @@ class Model(ModelDesc):
    def _get_optimizer(self):
       lr = tf.get_variable('learning_rate', initializer=self.lr_init, trainable=False)
       tf.summary.scalar('learning_rate', lr)
-      return tf.train.MomentumOptimizer(lr, 0.9, use_nesterov=True)#AdamOptimizer(lr, beta1=0.9, beta2=0.999,epsilon=1e-08)#MomentumOptimizer(lr, 0.9, use_nesterov=True)
+      init_base =  tf.multiply(tf.constant(-1.0), tf.divide(tf.log(self.lr_init),tf.log(tf.constant(10.0))))
+      momentum = tf.cond( tf.multiply(tf.constant(-1.0), tf.divide(tf.log(lr),tf.log(tf.constant(10.0)))) > init_base,
+                          lambda: tf.constant(0.9), lambda: tf.constant(0.88))
+      momentum = tf.cond( tf.multiply(tf.constant(-1.0),tf.divide(tf.log(lr),tf.log(tf.constant(10.0)))) > tf.add(tf.constant(1.0), init_base),
+                          lambda: tf.constant(0.95), lambda: momentum)
+      momentum = tf.cond( tf.multiply(tf.constant(-1.0),tf.divide(tf.log(lr),tf.log(tf.constant(10.0)))) > tf.add(tf.constant(2.0), init_base),
+                          lambda: tf.constant(0.99), lambda: momentum)
+      momentum = tf.cond( tf.equal(tf.constant(self.train_or_test), tf.constant(True)), lambda: tf.constant(0.99), lambda: momentum)
+      return tf.train.MomentumOptimizer(lr, momentum, use_nesterov=True)#return tf.train.AdamOptimizer(lr, beta1=0.9, beta2=0.999,epsilon=1e-08)
    
    non_depricated="""def optimizer(self):
    lr = tf.get_variable('learning_rate', initializer=0.001, trainable=False)
    tf.summary.scalar('learning_rate', lr)
    return tf.train.AdamOptimizer(lr, beta1=0.88, beta2=0.999,epsilon=1e-08)"""
 
-def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None, scale = None, multi_crop = None, crop_per_case = None, unknown_dir = None, original_dir=None):
+def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None, scale = None, multi_crop = None, crop_per_case = None, normalize = None, unknown_dir = None, original_dir=None):
    isTrain = train_or_test == 'train'
    isVal = train_or_test == 'val'
    #ds = FakeData([[args.batch_size*10, 224, 224, 3], [args.batch_size*10]], 1000, random=False, dtype='uint32')
-   ds = datapack.lymphoma2(train_or_test, image_size = image_size, scale_size = scale_size, scale = scale, multi_crop=multi_crop, crop_per_case = crop_per_case, shuffle = shuffle, dir = '../data', unknown_dir = unknown_dir,original_dir=original_dir)
+   ds = datapack.lymphoma2(train_or_test, image_size = image_size, scale_size = scale_size, scale = scale, multi_crop=multi_crop, crop_per_case = crop_per_case, normalize = normalize, shuffle = shuffle, dir = '../data', unknown_dir = unknown_dir,original_dir=original_dir)
    
    args.unique_samples = ds.unique_samples
    
    if train_or_test == 'train':
       args.class_0 = ds.class_0 
       args.class_1 = ds.class_1
+   else:
+      args.class_0 = 1.0
+      args.class_1 = 1.0
    if args.class_weights:
       args.class_0 = args.class_weights[0]
       args.class_1 = args.class_weights[1]
-   #pp_mean = ds.get_per_pixel_mean()
-   #np.random.seed(None)
+   
    aug_map_func = lambda dp: [dp[0], dp[1]]
    augmentors = []
    augmentor = None
    if isTrain:
-      augmentors = [
-         #and dividing by the standard deviation
-         #datapack.HematoEAug((0.7, 1.3, np.random.randint(2**32-1), True)),
-         datapack.NormStainAug(True),
-         #imgaug.Flip(horiz=True),
-         #imgaug.CenterPaste((args.scale_size, args.scale_size)),
-      ]
+      if bool(args.aug_he):
+         augmentors = [
+            #and dividing by the standard deviation
+            datapack.HematoEAug((0.3, 1.4, np.random.randint(2**32-1), True, 1.0)),
+            #datapack.NormStainAug(True),
+            imgaug.Flip(horiz=True),
+         ]
+      elif bool(args.aug_randnorm) or bool(args.aug_randhe):
+         prob_norm = args.aug_randnorm if args.aug_randnorm != 0. else 0
+         prob_he = args.aug_randhe if args.aug_randhe != 0. else 0
+         if prob_norm!=0 and prob_he!=0:
+            print(" >>>>>>> augmenting with normalization, H&E permutation, and flip.")
+            augmentors = [
+               datapack.NormStainAug((True, prob_norm)),
+               datapack.HematoEAug((0.4, 1.4, np.random.randint(2**32-1), True, prob_he)),
+               imgaug.Flip(horiz=True),
+            ]
+         elif prob_norm!=0 and prob_he==0:
+            print(">>>>>>>> Augmenting with nomalization and flip.")
+            augmentors = [
+               datapack.NormStainAug((True, prob_norm)),
+               #datapack.HematoEAug((0.4, 1.7, np.random.randint(2**32-1), True, prob_he)),
+               imgaug.Flip(horiz=True),
+            ]
+         else:
+            print(">>>>>>>> Augmenting with H&E permutation and flip.")
+            augmentors = [
+               #datapack.NormStainAug((True, prob_norm)),
+               datapack.HematoEAug((0.4, 1.4, np.random.randint(2**32-1), True, prob_he)),
+               imgaug.Flip(horiz=True),
+               #imgaug.Brightness(delta=20.0, clip=True),
+               imgaug.Contrast(factor_range=(0.7,1.3),clip=True),
+            ]
+      else:
+         augmentors = [
+            imgaug.Flip(horiz=True)
+            ]
       augmentor = imgaug.AugmentorList(augmentors)
-      #ds = AugmentImageComponent(ds, augmentors, copy=True)
       aug_map_func=lambda dp: [augmentor.augment(dp[0].astype("uint8")),dp[1]]
    else:
-      augmentors = [
-         #imgaug.MapImage(lambda x: x - pp_mean),
-         #imgaug.Brightness(20),
-         #datapack.HematoEAug((0.7, 1.3, np.random.randint(2**32-1), True)),
-         datapack.NormStainAug(True),
-         #imgaug.CenterPaste((args.scale_size, args.scale_size)),
-      ]
-      ds = AugmentImageComponent(ds, augmentors, copy=True)
-      
-   
+      if bool(args.aug_norm):
+         augmentors = [
+            #datapack.HematoEAug((0.7, 1.3, np.random.randint(2**32-1), True)),
+            datapack.NormStainAug((True,1.0)),
+         ]
+      else:
+         augmentors = []
+         
    print(">>>>>>> Data Set Size: ", ds.size())
    
    batch_size = None
@@ -333,41 +417,50 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
       batch_size = args.batch_size
    
    if isTrain:
-      if args.num_gpu == 1 or args.mp == 1:
+      print("multiprocess/thread mp = ", args.mp)
+      if args.mp==0:
+         print(">>>>>>>>>>>>>     non-multiprocess")
+         ds = AugmentImageComponent(ds, augmentors, copy=True)
+         ds = BatchData(ds, batch_size, remainder=not isTrain)
+         #ds = PrefetchData(ds,  nr_prefetch=batch_size*4, nr_proc=1)
+      elif args.mp==1:
          print(">>>>>>>>>>>>>     multiprocess, no augmented process mapping mp = 1")
          ds = AugmentImageComponent(ds, augmentors, copy=True) 
+         ds = PrefetchData(ds,  nr_prefetch=batch_size*4, nr_proc=mp.cpu_count())
          ds = BatchData(ds, batch_size, remainder=not isTrain)
-         #ds = PrefetchData(ds,  nr_prefetch=batch_size*4, nr_proc=3)#nr_prefetch
-      elif args.mp == 2:
-         print(">>>>>>>>>>>>>     multiprocess mapping")
+         print("       >>>>>>    using ",mp.cpu_count()," processes.")
+      elif args.mp==2:
+         print(">>>>>>>>>>>>>     multiprocess mapping mp = ", args.mp)
+         print("    >>>>>>>>>> Creating multiprocess with ", mp.cpu_count(), " total processes.")
          ds = MultiProcessMapData(ds,
                                   map_func=aug_map_func,
-                                  nr_proc=mp.cpu_count()*args.num_gpu if args.num_gpu > 1 else 2)
+                                  nr_proc=mp.cpu_count()//4)
          ds = PrefetchDataZMQ(ds, nr_proc = 1)
          ds = BatchData(ds, batch_size, remainder=not isTrain)
       else:
-         print(">>>>>>>>>>>>>     multithread mp=3")
+         print(">>>>>>>>>>>>>     multithread mp=",args.mp)
          ## Multithreaded
          ds = MultiThreadMapData(ds,
-                                 nr_thread= 25 if args.num_gpu > 1 else 2,
+                                 nr_thread= mp.cpu_count()//4,# if args.num_gpu > 1 else 2,
                                  map_func = aug_map_func,
-                                 buffer_size=batch_size*args.num_gpu if args.num_gpu > 1 else batch_size*2)
-         
+                                 buffer_size=batch_size*4)# if args.num_gpu > 1 else batch_size*2)
          ds = PrefetchDataZMQ(ds, nr_proc = 1)
          
          ds = BatchData(ds, batch_size, remainder=not isTrain)
       print(">>> Done. |Data|/Batch Size = ", ds.size())
       return ds
    else:
-      #ds = MapData(augmentor, aug_map_func)
+      if len(augmentors) != 0:
+         ds = AugmentImageComponent(ds, augmentors, copy=True)
       return BatchData(ds, batch_size, remainder=not isTrain)
 
-def get_config(train_or_test, train_config = None):
+def get_config(train_or_test, train_config = None, load_model = None):
    isTrain = train_or_test == 'train'
-   log_dir = 'train_log/'+args.model_name+'-first%s-second%s-max%s' % (str(args.drop_1), str(args.drop_2), str(args.max_epoch))
-   logger.set_logger_dir(log_dir, action='n')
+   if args.model_name is None:
+      args.model_name = "no_name"
+   log_dir = 'train_log/'+args.model_name
+   logger.set_logger_dir(log_dir, 'n')
    
-   drop_rate = 0.0
    dataset_train = 1
    dataset_val = None
    steps_per_epoch = 0
@@ -376,40 +469,40 @@ def get_config(train_or_test, train_config = None):
    # dataflow structure [im, label] in parralel
    if isTrain:
       print(">>>>>> Loading training and validation sets")
-      dataset_train = get_data('train', image_size = args.image_size, scale_size = args.scale_size,  scale = args.scale, multi_crop=args.multi_crop, crop_per_case = args.crop_per_case, shuffle = False)
+      dataset_train = get_data('train', image_size = args.image_size, scale_size = args.scale_size,  scale = args.scale, multi_crop=args.multi_crop, crop_per_case = args.crop_per_case, normalize = args.aug_norm, shuffle = True)
       
-      steps_per_epoch = dataset_train.size()/args.num_gpu #if args.num_gpu > 1 else dataset_train.size()/2# = |data|/(batch size * num gpu)
+      steps_per_epoch = dataset_train.size()#/args.num_gpu if (args.mp != 0 or args.mp != 1)  else dataset_train.size()# = |data|/(batch size * num gpu)
       
-      dataset_val = get_data('val', image_size = args.image_size, scale_size = args.scale_size, scale = args.scale, multi_crop=args.multi_crop, crop_per_case = args.crop_per_case, shuffle = False)
-
-      drop_rate = args.drop_out if args.drop_out is not None else 0.0
-      # dense net
+      dataset_val = get_data('val', image_size = args.image_size, scale_size = args.scale_size, scale = args.scale, multi_crop=args.multi_crop, crop_per_case = args.crop_per_case, normalize = args.aug_norm, shuffle = False)
+      
+   drop_rate = args.drop_out if args.drop_out is not None else 0.0
    
    print(" >>>>>>>>>> Steps Per Epoch: ", steps_per_epoch)
    print(">>>>>> Constructing Neural Network...")
    
-   denseModel = Model(depth=args.depth, image_size = args.scale_size, lr_init = args.lr_init, kernels = args.kernels, kernel_size = args.kernel_size, expansion=args.expansion, class_0 = args.class_0, class_1 = args.class_1, drop_rate = drop_rate, train_or_test=isTrain)
-   print(">>> Done.")
+   denseModel = Model(depth=args.depth, image_size = args.scale_size, lr_init = args.lr_init, kernels = args.kernels, kernel_size = args.kernel_size, expansion=args.expansion, class_0 = args.class_0, class_1 = args.class_1, drop_rate = drop_rate, drop_pattern = args.drop_pattern, train_or_test=isTrain)
    
    if isTrain:
       print("Setting up training configuration: callbacks, validation checks and hyperparameter scheduling.")
       return TrainConfig(
          dataflow=dataset_train,
          callbacks=[
-            MovingAverageSummary(), 
+            MovingAverageSummary(),
             ModelSaver(), # Record state graph at intervals during epochs
             InferenceRunner(input=dataset_val,
                             infs=[ScalarStats('cost'), ClassificationError()],
                             ),
-            ScheduledHyperParamSetter('learning_rate',
-                                      [(args.drop_0, args.scale_lr*args.lr_0),
-                                       (args.drop_1,  args.scale_lr*args.lr_1)]),
-            HyperParamSetterWithFunc('learning_rate',
-                                     lambda e, x: x * float(0.1) if e % 200 == 0 and e > args.drop_2 else x),# (1+e)/(2*20)
-            #ScheduledHyperParamSetter('learning_rate',[(args.drop_0, args.scale_lr*args.lr_0), (args.drop_1,  args.scale_lr*args.lr_1), (args.drop_2,  args.scale_lr*args.lr_2), (args.drop_3,  args.scale_lr*args.lr_3)]), # denote current hyperparameters
+            MinSaver('validation_error'), #save model with min val-error, must be after inference
+            #ScheduledHyperParamSetter('learning_rate',
+            #                          [(args.drop_0, args.scale_lr*args.lr_0),
+            #                           (args.drop_1,  args.scale_lr*args.lr_1)]),
+            #HyperParamSetterWithFunc('learning_rate',
+            #                         lambda e, x: x * float(0.1) if e % 15 == 0 and e > args.drop_2 else x),# (1+e)/(2*20) #ScheduledHyperParamSetter('learning_rate',[(args.drop_0, args.scale_lr*args.lr_0), (args.drop_1,  args.scale_lr*args.lr_1), (args.drop_2,  args.scale_lr*args.lr_2), (args.drop_3,  args.scale_lr*args.lr_3)]), # denote current hyperparameter)
+            StatMonitorParamSetter('learning_rate', 'validation_error',
+                                   lambda x: x * 0.1, threshold=1e-20, last_k=20),
             MergeAllSummaries()
          ],
-         model=denseModel,
+         model = denseModel,
          session_creator = None,
          session_config = train_config,
          steps_per_epoch=steps_per_epoch,
@@ -420,9 +513,18 @@ def get_config(train_or_test, train_config = None):
       Predictive model configuration for testing 
       and classifying.
       """
+      class TestParamSetter(Callback):
+         #def _before_run(self, _):
+         #   return tf.train.SessionRunArgs(fetches=[],feed_dict={'PlaceholderWithDefault_1:0':1.0, 'PlaceholderWithDefault_2:0':False})#'drop_rate:0':1, 'train_or_test:0':False
+         def _setup_graph(self):
+            self._drop_rate = [k for k in tf.global_variables() if k.name == 'PlaceholderWithDefault_1:0'][0]
+            self._train_or_test = [k for k in tf.global_variables() if k.name == 'PlaceholderWithDefault_2:0'][0]
+         def _trigger_step(self):
+            self._drop_rate.load(1.0)
+            self._train_or_test.load(False)
       print(">>>>>> Constructing prediction variables.")
       return PredictConfig(
-         model=denseModel,
+         model = denseModel,
          input_names= ['input', 'label'],#denseModel._get_inputs(),
          output_names=['output', 'train_error', 'cross_entropy_loss', 'input'],
       )
@@ -431,6 +533,7 @@ class predictModel:
    def __init__(self, config, data = None, image_size = None):
       self.test_data = data
       self.predictor = SimpleDatasetPredictor(config, self.test_data)
+      #MultiProcessDatasetPredictor(config, self.test_data, nr_proc=2, use_gpu=True)
       
    def _get_inputs(self):
       return [InputDesc(tf.float32, [None, image_size, image_size, 3], 'input'),
@@ -469,6 +572,7 @@ if __name__ == '__main__':
    parser.add_argument('--batch_size',type=int, default=4,help='batch size')
    parser.add_argument('--depth',type=int, default=13, help='The depth of densenet')
    parser.add_argument('--drop_out',type=float, help='drop out rate')
+   parser.add_argument('--drop_pattern',type=int, help='drop layer every drop_pattern layer')
    parser.add_argument('--max_epoch',type= int, default=256,help='max epoch')
    parser.add_argument('--tot',type= str, default='train',help=" 'train' or 'test'")
    parser.add_argument('--out_dir',type= str, default='../data/Unknowns/predictions/',help="img out dir")
@@ -477,23 +581,23 @@ if __name__ == '__main__':
    parser.add_argument('--original_dir',default=False,help="directory to save originals")
    parser.add_argument('--num_gpu',type= int,help="Number GPU to use if not specificaly assigned")
    parser.add_argument('--scale_lr',type= float,default=1.0,help="Scale learning rate factor (for distributed training)")
-   parser.add_argument('--gpu_frac',type= float,default=0.99,help="Number GPU to use if not specificaly assigned")
-   parser.add_argument('--mp',default=True,help="Whether or not to use parallel multiprocessing over or on GPU. 0 no, 1 yes. Default yes.")
-   parser.add_argument('--nccl',type=int,default=0,help="Whether NCCL available for DGX like machines.")
-   parser.add_argument('--class_0',type=int, default=0,help="number samples in class 0")
-   parser.add_argument('--class_1',type=int, default=0,help="number samples in class 1")
+   parser.add_argument('--gpu_frac',type= float,default=0.96,help="Number GPU to use if not specificaly assigned")
+   parser.add_argument('--mp',type=int, default=2,help="Whether or not to use parallel multiprocessing over or on GPU. 0 no, 1 yes. Default yes.")
+   parser.add_argument('--nccl',type=int,default=1,help="Whether NCCL available for DGX like machines.")
+   parser.add_argument('--class_0',type=int, default=1,help="number samples in class 0")
+   parser.add_argument('--class_1',type=int, default=1,help="number samples in class 1")
    parser.add_argument('--multi_crop',type=int, default=4,help="number, if any, of crops to take from crop_per_case images. Average of crop classifications used in application")
-   parser.add_argument('--image_size',type=int, default=448,help="original image size to scale to scale_size ")
+   parser.add_argument('--image_size',type=int, default=224,help="original image size to scale to scale_size ")
+   parser.add_argument('--aug_norm',type=int, default=0,help="pre-process image augmentation by normalizing H&E staining. 1 yes, 0 no.")
+   parser.add_argument('--aug_randnorm',type=float, default=0.0,help="Normalization of H&E staining image augmentation performed with probability of value passed range [0,1.0)")
+   parser.add_argument('--aug_randhe',type=float, default=0.0,help="perform random augmentation of H&E staining color space image augmentation with probability passed [0,1.0)")
+   parser.add_argument('--aug_he',type=int, default=0,help="image augmentation by randomly permuting H&E staining. 1 yes, 0 no.")
    parser.add_argument('--scale_size',type=int, default=224,help="image size after scaling")
    parser.add_argument('--scale',type=int, default=2,help="factor of 224 to crop and scale down scale*(224,224)->(224,224)")
    parser.add_argument('--crop_per_case',type=int, default=40,help="number, more than 1, of images from each case to multi_crop. Average of crop classifications used in application")
    parser.add_argument('--unique_samples',type=int, help="Number of unique samples (excluding crops) used for averaging testing results")
    args = parser.parse_args()
    args.scale_size = args.image_size
-   #if args.image_size != args.scale_size:
-   #   args.scale = float(args.scale_size)/float(args.image_size)
-   #   args.scale_size = int(args.image_size*args.scale)
-   #   print( ">>>>> Scaling ", args.image_size, " to ", args.scale_size, " by factor ", args.scale)
    
    if args.class_weights:
       args.class_weights = [float(weight) for weight in args.class_weights.split(',')]
@@ -503,22 +607,18 @@ if __name__ == '__main__':
       args.num_gpu = len(args.gpu.split(','))#max(get_num_gpu(),1)
       note = "Slurm assigns on DGX"
       print(" >>>> Hard assigning to all available gpu")
-      #os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-      #os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str,range(args.num_gpu)))#args.gpu
+   os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+   os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str,range(args.num_gpu)))#args.gpu
    
    if not args.tot:
       args.tot == 'train'
       
    session_config = None
-   if args.tot =='train':
+   if True:#args.tot =='train':
       print("Using personal session config")
-      #intra_op_parallelism_threads=num_cores,inter_op_parallelism_threads=num_cores,
       gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction = args.gpu_frac, allow_growth=True)
-      session_config = tf.ConfigProto(intra_op_parallelism_threads=args.num_gpu,inter_op_parallelism_threads=args.num_gpu, gpu_options=gpu_options, allow_soft_placement = True) #or session creator
+      session_config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement = True) 
       
-   #if args.num_gpu:
-   #   args.batch_size *= args.num_gpu
-   
    nr_tower = 1
    if args.gpu or args.num_gpu:
       if args.num_gpu and (not args.gpu):
@@ -527,10 +627,10 @@ if __name__ == '__main__':
       else:
          nr_tower = len(args.gpu.split(','))
    
-   config = get_config(args.tot, train_config=session_config)
-   print(tf.test.is_gpu_available())                                          
-   print(get_available_gpus())
-
+   config = get_config(args.tot, train_config=session_config, load_model = args.load)
+   #print(tf.test.is_gpu_available())                                          
+   #print(get_available_gpus())
+   
    print("Net configured")
    
    if args.load:
@@ -555,10 +655,10 @@ if __name__ == '__main__':
       # retrieve unknown from /data/Unknown/unknown_dir   optional save data to original_dir (creates if d.n.e.)
       # writes predictions (image and summary file) to path = '../data/Unknown/'+args.unknown_dir +'/predictions'
       
-      data = get_data('test',image_size=args.image_size, scale_size = args.scale_size, scale = args.scale, multi_crop = args.multi_crop, crop_per_case = args.crop_per_case, shuffle = False,unknown_dir = args.unknown_dir, original_dir=args.original_dir)
+      data = get_data('test',image_size=args.image_size, scale_size = args.scale_size, scale = args.scale, multi_crop = args.multi_crop, crop_per_case = args.crop_per_case, normalize = args.aug_norm, shuffle = False,unknown_dir = args.unknown_dir, original_dir=args.original_dir)
       
       def classify_unknown(model_config, dp, args):
-         predictor = predictModel(config, data = dp, image_size = args.scale_size)
+         predictor = predictModel(config, data = dp, image_size = args.image_size)
          res, all_res = predictor.get_results()
          img_list = []
          prediction = []
@@ -619,7 +719,7 @@ if __name__ == '__main__':
                if pred_bl == pred_dl:
                   tie += 1
                
-               multi_crop_count = 0 if max_crop_met == 0 else -2
+               multi_crop_count = 0 if max_crop_met == 0 else -1
                crop_per_case -= 1
                
                path = '../data/Predictions/'+args.unknown_dir
@@ -635,7 +735,7 @@ if __name__ == '__main__':
                prediction_file = open(path, append_write)
                prediction_file.write(str(pred_bl)+','+str(pred_dl)+"\n")
                prediction_file.close()
-         
+               
          prediction_summary = open( path, 'a')
          #'../data/Unknown/'+args.unknown_dir+'/predictions/predictions.txt', 'a')
          prediction_summary.write("\n")

@@ -7,7 +7,7 @@ from tensorpack.dataflow import imgaug
 #except AttributeError:
 #    Transform = imgaug.Transform
 import argparse
-import numpy as np
+
 import cv2
 from scipy import ndimage
 from os.path import basename, join, exists
@@ -17,6 +17,7 @@ from time import time
 import sys
 import copy as copy_dp
 
+import numpy as np
 #np.random.seed(101)
 
 PATCH_SIZES = [224, 224] #[672,672]
@@ -38,8 +39,9 @@ notification_he = 0
 notification_zoom = 0
 
 class NormStainAug(imgaug.ImageAugmentor):
-    def __init__(self, param=True):
-        self.copy = param
+    def __init__(self, param=(True,1.0)):
+        self.copy = param[0]
+        self.with_prob = param[1]
         super(NormStainAug, self).__init__()
         self._init(locals())
         
@@ -54,28 +56,41 @@ class NormStainAug(imgaug.ImageAugmentor):
 
     def _augment_return_params(self, img):
         p_holder = np.array([0])
-        copy_func = copy_dp.deepcopy if self.copy else lambda x: x
-        img_dup = copy_func(img)#.astype("uint8"))
-        t = self.get_transform(p_holder).apply_image(img_dup)#[0])
-        return (t, self.copy)
+        p = np.random.RandomState(None).uniform(low=0, high=1, size=1)[0]
+        if p <= self.with_prob:
+            copy_func = copy_dp.deepcopy if self.copy else lambda x: x
+            img_dup = copy_func(img)#.astype("uint8"))
+            t = self.get_transform(p_holder).apply_image(img_dup)#[0])
+            return t, (self.copy, self.with_prob)
+        else:
+            return img, (self.copy, self.with_prob)
     
     def _get_augment_params(self, img):
-        return self.copy
+        return (self.copy, self.with_prob)
     
     def _augment(self, img, prms):
         p_holder = np.array([0])
-        self.copy = prms
-        copy_func = copy_dp.deepcopy if self.copy else lambda x: x
-        img_dup = copy_func(img.astype("uint8"))
-        t = self.get_transform(p_holder).apply_image(img_dup)
-        return t
+        self.copy = prms[0]
+        self.with_prob = prms[1]
+        p = np.random.RandomState(None).uniform(low=0, high=1.0, size=1)[0]
+        if p <= self.with_prob:
+            copy_func = copy_dp.deepcopy if self.copy else lambda x: x
+            img_dup = copy_func(img.astype("uint8"))
+            t = self.get_transform(p_holder).apply_image(img_dup)
+            return t
+        else:
+            return img
     
     def augment(self, img):
         p_holder = np.array([0])
-        copy_func = copy_dp.deepcopy if self.copy else lambda x: x
-        img_dup = copy_func(img.astype("uint8"))
-        t = self.get_transform(p_holder).apply_image(img_dup)
-        return t
+        p = np.random.RandomState(None).uniform(low=0, high=1, size=1)[0]
+        if p <= self.with_prob:
+            copy_func = copy_dp.deepcopy if self.copy else lambda x: x
+            img_dup = copy_func(img.astype("uint8"))
+            t = self.get_transform(p_holder).apply_image(img_dup)
+            return t
+        else:
+            return img
 
 class ZoomAug(imgaug.ImageAugmentor):
     def __init__(self, param = (10, None, True)):
@@ -124,12 +139,13 @@ class ZoomAug(imgaug.ImageAugmentor):
         return t, (self.zoom, self.seed, self.copy)
 
 class HematoEAug(imgaug.ImageAugmentor):
-    def __init__(self, param = (0.7, 1.3, None, True)):
+    def __init__(self, param = (0.5, 1.7, None, True, 1.0)):
         super(HematoEAug, self).__init__()
         self.low = param[0]
         self.high = param[1]
         self.seed = param[2]
         self.copy = param[3]
+        self.with_prob = param[4]
         self._init(locals())
         
     def	reset_state(self):
@@ -143,32 +159,49 @@ class HematoEAug(imgaug.ImageAugmentor):
         return coords
     
     def _get_augment_params(self, img):
-        return (self.low, self.high, self.seed, self.copy)
+        return (self.low, self.high, self.seed, self.copy, self.with_prob)
     
-    def	_augment(self, img, param = (0.7, 1.3, None, True)):
+    def	_augment(self, img, param = (0.5, 1.7, None, True, 1.0)):
         self.low = param[0]
         self.high = param[1]
         self.copy = param[3]
         self.seed = param[2]
+        self.with_prob = param[4]
         p_holder = np.array([0])
-        copy_func = copy_dp.deepcopy if self.copy else lambda x: x
-        img_dup = copy_func(img.astype("uint8"))
-        t = self.get_transform(p_holder).apply_image(img_dup)
-        return t
+        p = np.random.RandomState(None).uniform(low=0, high=1.0, size=1)[0]
+        if p <= self.with_prob:
+            copy_func = copy_dp.deepcopy if self.copy else lambda x: x
+            img_dup = copy_func(img.astype("uint8"))
+            t = self.get_transform(p_holder).apply_image(img_dup)
+            return t
+        else:
+            return img
 
     def augment(self, img):
         p_holder = np.array([0])
-        copy_func = copy_dp.deepcopy if self.copy else lambda x: x
-        img_dup = copy_func(img.astype("uint8")) 
-        t = self.get_transform(p_holder).apply_image(img_dup)
-        return t
+        p = np.random.RandomState(None).uniform(low=0, high=1.0, size=1)[0]
+        if p <= self.with_prob:
+            copy_func = copy_dp.deepcopy if self.copy else lambda x: x
+            img_dup = copy_func(img.astype("uint8"))
+            t = self.get_transform(p_holder).apply_image(img_dup)
+            return t
+        else:
+            return img
     
     def _augment_return_params(self, img):
         p_holder = np.array([0])
         copy_func = copy_dp.deepcopy if self.copy else lambda x: x
         img_dup = copy_func(img.astype("uint8"))
         t = self.get_transform(p_holder).apply_image(img_dup)
-        return t, (self.low, self.high, self.seed, self.copy)
+
+        p = np.random.RandomState(None).uniform(low=0, high=1.0, size=1)[0]
+        if p <= self.with_prob:
+            copy_func = copy_dp.deepcopy if self.copy else lambda x: x
+            img_dup = copy_func(img.astype("uint8"))
+            t = self.get_transform(p_holder).apply_image(img_dup)
+            return t, (self.low, self.high, self.seed, self.copy, self.with_prob)
+        else:
+            return img, (self.low, self.high, self.seed, self.copy, self.with_prob)
 
 class normalize_staining(imgaug.transform.ImageTransform):
     def __init__(self, copy = True):

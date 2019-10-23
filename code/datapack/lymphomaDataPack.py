@@ -6,8 +6,6 @@
 #SBATCH -e slurm-%j.err-%N # name of the stderr, using the job number (%j) and the first node (%N)
 #SBATCH --gres=gpu:5
 
-import numpy as np
-import tensorflow as tf
 import argparse
 import os
 
@@ -34,6 +32,9 @@ import cv2
 import copy
 
 from .medical_aug import normalize_staining, hematoxylin_eosin_aug
+
+import numpy as np
+import tensorflow as tf
 
 #sys.path.append(os.getcwd())
 prediction_dir = "/home/sci/samlev/convNet_Lymphoma_Classifier/data/Unknowns/predictions/"
@@ -73,7 +74,7 @@ def read_data(filename):
         fo.close()
     return (data, label)
 
-def read_lymphoma(filenames,  train_or_test = 'train', image_size = 448, scale_size = 224, scale = 2, multi_crop = 0, crop_per_case = None, original_dir=None):
+def read_lymphoma(filenames,  train_or_test = 'train', image_size = 448, scale_size = 224, scale = 2, multi_crop = 0, crop_per_case = None, normalize = None, original_dir=None):
     num_show=5
     ret = []
     class_0 = 0
@@ -132,10 +133,6 @@ def read_lymphoma(filenames,  train_or_test = 'train', image_size = 448, scale_s
             img = np.transpose(img, [1, 2, 0])
             img_og = copy.deepcopy(img)
             
-            #im_og = datapack.medical_aug.hematoxylin_eosin_aug(1.3, 1.4,8).apply_image(im_og)
-            #
-            #img_augment = normalize_staining().apply_image(img_og)
-            #img_aug = copy.deepcopy(img_augment)
             
             aspect_ratio = min( img.shape[1]/float(img.shape[0]) , img.shape[0]/float(img.shape[1]) )
             acc_scaleSize = (int(scaleSize[0]*aspect_ratio),scaleSize[1]) if img.shape[0] < img.shape[1] else (scaleSize[0],int(aspect_ratio*scaleSize[1]))
@@ -147,13 +144,13 @@ def read_lymphoma(filenames,  train_or_test = 'train', image_size = 448, scale_s
             
             multi_crop_ = 1
             if crop_count < crop_per_case:
-                multi_crop_ = multi_crop
+                multi_crop_ = multi_crop+1
                 crop_count += 1
             for tile in range(multi_crop_):
                 if multi_crop_ != 1:
                     total_crops += 1
-                start_w = [100, 300, 500, 700][tile] if multi_crop <= 4 else [100, 200, 300, 400, 500, 600][tile]
-                start_h = [400, 400, 400, 400][tile] if multi_crop <= 4	else [400, 400, 400, 400, 400, 400][tile]
+                start_w = [100, 300, 500, 700][tile] if multi_crop_ <= 4 else [100, 200, 300, 400, 500, 600][tile]
+                start_h = [400, 400, 400, 400][tile] if multi_crop_ <= 4 else [400, 400, 400, 400, 400, 400][tile]
                 
                 copy_func = copy.deepcopy if multi_crop_ != 1 else lambda x: x
                 img_crop = copy.deepcopy(img_og)
@@ -170,14 +167,19 @@ def read_lymphoma(filenames,  train_or_test = 'train', image_size = 448, scale_s
                 
                 # to place as nd array for tensorflow and augmentors
                 if label[k] == 0:
+                    #label[k] = 0.1
                     class_0 += 1
-                else:
+                elif label[k] == 1:
+                    #label[k] = 0.9
                     class_1 += 1
 
-                if label[k] != 0 or label[k] != 1:
+                if label[k] != 0 and label[k] != 1:
                     for i in range(20):
                         print(" >>>>>>>>>>>>>> LABELING INCORRECT> VALUE: ",label[k])
-                    
+
+                if normalize:
+                    img_crop = normalize_staining().apply_image(img_crop)
+                
                 ret.append([img_crop.astype("uint8"), label[k]])
                 #img = copy.deepcopy(img_og)
                 
@@ -210,13 +212,15 @@ class lymphomaBase( RNGDataFlow ):
     # yields [ Image, Label ]
     # image: 900x900x3 in range [0,255]
     # label: int either 0 or 1
-    def __init__(self, train_or_test, image_size = None, scale_size = None, scale = 2, multi_crop=None, crop_per_case = None, shuffle=None, dir=None, lymphoma_num_classes=2,unknown_dir = None, original_dir=None):
+    def __init__(self, train_or_test, image_size = None, scale_size = None, scale = 2, multi_crop=None, crop_per_case = None, normalize = 1, shuffle=None, dir=None, lymphoma_num_classes=2,unknown_dir = None, original_dir=None):
         assert train_or_test in ['train', 'test', 'val']
         assert lymphoma_num_classes == 2 or lymphoma_num_classes == 10
         self.lymphoma_num_classes = lymphoma_num_classes
 
         self.shuffle = shuffle
 
+        self.normalize = bool(normalize)
+        
         if multi_crop is None:
             multi_crop = 0
         self.multi_crop = multi_crop
@@ -247,7 +251,7 @@ class lymphomaBase( RNGDataFlow ):
         self.scale_size = scale_size
         
         print(">> reading in files.")
-        data = read_lymphoma(self.fs, train_or_test = self.train_or_test, image_size = self.image_size, scale_size = self.scale_size, scale = self.scale, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case, original_dir=original_dir) #different classes changes here ect..
+        data = read_lymphoma(self.fs, train_or_test = self.train_or_test, image_size = self.image_size, scale_size = self.scale_size, scale = self.scale, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case, normalize = self.normalize, original_dir=original_dir) #different classes changes here ect..
         
         self.data = data[0]
         self.class_0 = data[1]
@@ -311,7 +315,7 @@ class lymphoma2(lymphomaBase):
     image is 900x900x3 in the range [0,255].
     label is an int.
     """
-    def __init__(self, train_or_test, image_size = None, scale_size = None, scale = None, multi_crop= None, crop_per_case = None, shuffle= None, dir=None, unknown_dir=None,original_dir=None):
+    def __init__(self, train_or_test, image_size = None, scale_size = None, scale = None, multi_crop= None, crop_per_case = None, normalize = None, shuffle= None, dir=None, unknown_dir=None,original_dir=None):
 
         """
         Args:
@@ -324,6 +328,10 @@ class lymphoma2(lymphomaBase):
             shuffle = False
         self.shuffle = shuffle
 
+        if normalize is None:
+            normalize = 1
+        self.normalize = bool(normalize)
+        
         if multi_crop == None:
             multi_crop = 0
         self.multi_crop = multi_crop
@@ -334,7 +342,7 @@ class lymphoma2(lymphomaBase):
         self.image_size = image_size
         self.scale_size = scale_size
         
-        super(lymphoma2, self).__init__(train_or_test, image_size = self.image_size, scale_size = self.scale_size, scale=self.scale, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case, shuffle = self.shuffle, dir=dir, lymphoma_num_classes = 2,unknown_dir = unknown_dir, original_dir = original_dir)
+        super(lymphoma2, self).__init__(train_or_test, image_size = self.image_size, scale_size = self.scale_size, scale=self.scale, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case, normalize = self.normalize, shuffle = self.shuffle, dir=dir, lymphoma_num_classes = 2,unknown_dir = unknown_dir, original_dir = original_dir)
 
 if __name__ == '__main__':
 
