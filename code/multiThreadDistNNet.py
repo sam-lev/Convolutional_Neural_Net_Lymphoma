@@ -1,5 +1,4 @@
 #!/home/sci/samlev/anaconda3/envs/tf2/bin/python3.5
-
 #SBATCH --time=41:06:66 # walltime, abbreviated by -t
 #SBATCH --mem=110G
 #SBATCH --job-name="shmerp"
@@ -69,7 +68,7 @@ python3 denseNet_Lymphoma.py --tot test --gpu 0,1 --batch_size 500 --model_name 
 """
 
 class Model(ModelDesc):
-   def __init__(self, depth, image_size, lr_init, kernels, kernel_size, expansion, class_0, class_1, drop_rate, drop_pattern, train_or_test):
+   def __init__(self, depth, image_size, lr_init, kernels, kernel_size, expansion, class_0, class_1, drop_rate, drop_pattern, skip_norm, train_or_test):
       super(Model, self).__init__()
       self.step = tf.train.get_or_create_global_step()
       self.N = int((depth - 4)  / 3)
@@ -86,7 +85,8 @@ class Model(ModelDesc):
       self.train_or_test= train_or_test
       self.class_0 = None
       self.class_1 = None
-
+      self.skip_norm = skip_norm if skip_norm is not None else depth+1
+      
       print("traing or test:" , self.train_or_test)
       print("drop ", self.drop_rate)
       
@@ -141,17 +141,18 @@ class Model(ModelDesc):
       def batch_norm(scope, name, layer, decay, layer_num, norm_pattern, training):
          with tf.variable_scope(scope) as s:
             if training:
-               layer = BatchNorm(name, layer) if layer_num%norm_pattern == 0 else layer
+               layer = BatchNorm(name, layer) if layer_num%norm_pattern != 0 else layer
             else:
-               layer = BatchNorm(name, l, decay=decay, use_local_stat=False) if layer_num%norm_pattern == 0 else layer
+               #decay=decay
+               layer = BatchNorm(name, layer, decay=0.59, use_local_stat=False) if layer_num%norm_pattern != 0 else layer
          return layer
       
-      def add_layer(name, l, kernel_size, growth_rate, drop_rate, training, layer_num, drop_pattern):
+      def add_layer(name, l, kernel_size, growth_rate, drop_rate, training, layer_num, drop_pattern, skip_norm):
          shape = l.get_shape().as_list()
          in_channel = shape[3] 
          with tf.variable_scope(name) as scope:
             # layer num mod 1 for bnorm every layer
-            c = batch_norm(name, 'bn.{}'.format(layer_num), l, 0.99, layer_num, 1, training)
+            c = batch_norm(name, 'bn.{}'.format(layer_num), l, 0.49, layer_num, skip_norm, training) #epsilon=0.001
             c = tf.nn.relu(c)
             c = conv('conv1', c, growth_rate, 1, kernel_size)
             l = tf.concat([c, l], 3)
@@ -165,7 +166,7 @@ class Model(ModelDesc):
          shape = l.get_shape().as_list()
          in_channel = shape[3]
          with tf.variable_scope(name) as scope:
-            l = batch_norm(name, 'bntransit.{}'.format(transition_number), l, 0.99, 42, 1, training)
+            l = batch_norm(name, 'bntransit.{}'.format(transition_number), l, 0.49, 42, 43, training)
             l = tf.nn.relu(l)
             l = Conv2D('conv1', l, in_channel, 1, stride=1, use_bias=False, nl=tf.nn.relu)
             if drop_pattern!=0:
@@ -174,7 +175,7 @@ class Model(ModelDesc):
          return l
       
       def dense_net(name):
-
+         
          l = conv('conv0',image, self.filters_init , 1, self.kernel_size)
          
          with tf.variable_scope('block1') as scope:
@@ -182,22 +183,23 @@ class Model(ModelDesc):
                #(name, l, kernel_size, growth_rate, drop_rate, training, layer_num, drop_pattern):
                l = add_layer(name='dense_layer.{}'.format(i), l=l, kernel_size=self.kernel_size,
                              growth_rate=self.growthRate, drop_rate=self.drop_rate,
-                             training=self.train_or_test, layer_num=i, drop_pattern=0)
+                             training=self.train_or_test, layer_num=i, drop_pattern=0, skip_norm=self.skip_norm)
+               
             l = add_transition(name='transition1', l=l , drop_rate=self.drop_rate,
                                training=self.train_or_test, drop_pattern=self.drop_pattern, transition_number=1)
             
          with tf.variable_scope('block2') as scope:
             for i in range(self.N):
                l = add_layer('dense_layer.{}'.format(i), l, self.kernel_size, self.growthRate,
-                             self.drop_rate, self.train_or_test, i, self.drop_pattern)
+                             self.drop_rate, self.train_or_test, i, self.drop_pattern, self.skip_norm)
             l = add_transition('transition2', l, self.drop_rate, self.train_or_test, self.drop_pattern, 2)
          
          with tf.variable_scope('block3') as scope:
             for i in range(self.N):
                l = add_layer('dense_layer.{}'.format(i), l, self.kernel_size, self.growthRate,
-                             self.drop_rate, self.train_or_test, i,  self.drop_pattern)
+                             self.drop_rate, self.train_or_test, i,  self.drop_pattern, self.skip_norm)
          
-         l = batch_norm(name, 'bnlast', l, 0.99, 42, 1, self.train_or_test)
+         l = batch_norm(name, 'bnlast', l, 0.49, 42, 42+1, self.train_or_test)
          l = tf.nn.relu(l)
          l = GlobalAvgPooling('gap', l)
          logits = FullyConnected('linear', l, out_dim=2, nl=tf.identity)
@@ -328,7 +330,7 @@ class Model(ModelDesc):
                           lambda: tf.constant(0.95), lambda: momentum)
       momentum = tf.cond( tf.multiply(tf.constant(-1.0),tf.divide(tf.log(lr),tf.log(tf.constant(10.0)))) > tf.add(tf.constant(2.0), init_base),
                           lambda: tf.constant(0.99), lambda: momentum)
-      momentum = tf.cond( tf.equal(tf.constant(self.train_or_test), tf.constant(True)), lambda: tf.constant(0.99), lambda: momentum)
+      momentum = tf.cond( tf.equal(tf.constant(self.train_or_test), tf.constant(False)), lambda: tf.constant(0.99), lambda: momentum)
       return tf.train.MomentumOptimizer(lr, momentum, use_nesterov=True)#return tf.train.AdamOptimizer(lr, beta1=0.9, beta2=0.999,epsilon=1e-08)
    
    non_depricated="""def optimizer(self):
@@ -366,15 +368,23 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
             imgaug.Flip(horiz=True),
          ]
       elif bool(args.aug_randnorm) or bool(args.aug_randhe):
-         prob_norm = args.aug_randnorm if args.aug_randnorm != 0. else 0
-         prob_he = args.aug_randhe if args.aug_randhe != 0. else 0
+         prob_norm = args.aug_randnorm if int(args.aug_randnorm) != 0 else 0
+         prob_he = args.aug_randhe if int(args.aug_randhe) != 0 else 0
          if prob_norm!=0 and prob_he!=0:
             print(" >>>>>>> augmenting with normalization, H&E permutation, and flip.")
+            #p_aug = np.random.RandomState(None).uniform(low=0, high=1.0, size=1)[0]
+            #if p_aug <= 0.5:
             augmentors = [
-               datapack.NormStainAug((True, prob_norm)),
                datapack.HematoEAug((0.4, 1.4, np.random.randint(2**32-1), True, prob_he)),
+               datapack.NormStainAug((True, prob_norm)),
                imgaug.Flip(horiz=True),
             ]
+            #else:
+            #   augmentors = [
+            #      #datapack.HematoEAug((0.4, 1.4, np.random.randint(2**32-1), True, prob_he)),
+            #      datapack.NormStainAug((True, prob_norm)),
+	    #      imgaug.Flip(horiz=True),
+            #   ]
          elif prob_norm!=0 and prob_he==0:
             print(">>>>>>>> Augmenting with nomalization and flip.")
             augmentors = [
@@ -398,10 +408,20 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
       augmentor = imgaug.AugmentorList(augmentors)
       aug_map_func=lambda dp: [augmentor.augment(dp[0].astype("uint8")),dp[1]]
    else:
+      prob_he = args.aug_randhe if args.aug_randhe != 0. else 0
       if bool(args.aug_norm):
          augmentors = [
             #datapack.HematoEAug((0.7, 1.3, np.random.randint(2**32-1), True)),
             datapack.NormStainAug((True,1.0)),
+         ]
+      elif prob_he != 0:
+         print(">>>>>>>> Augmenting with H&E permutation and flip.")
+         augmentors = [
+            #datapack.NormStainAug((True, prob_norm)),                                                                           
+            datapack.HematoEAug((0.4, 1.4, np.random.randint(2**32-1), True, prob_he)),
+            imgaug.Flip(horiz=True),
+            #imgaug.Brightness(delta=20.0, clip=True),                                                                           
+            imgaug.Contrast(factor_range=(0.7,1.3),clip=True),
          ]
       else:
          augmentors = []
@@ -426,7 +446,7 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
       elif args.mp==1:
          print(">>>>>>>>>>>>>     multiprocess, no augmented process mapping mp = 1")
          ds = AugmentImageComponent(ds, augmentors, copy=True) 
-         ds = PrefetchData(ds,  nr_prefetch=batch_size*4, nr_proc=mp.cpu_count())
+         ds = PrefetchData(ds,  nr_prefetch=batch_size*4, nr_proc=mp.cpu_count()//4)
          ds = BatchData(ds, batch_size, remainder=not isTrain)
          print("       >>>>>>    using ",mp.cpu_count()," processes.")
       elif args.mp==2:
@@ -480,7 +500,7 @@ def get_config(train_or_test, train_config = None, load_model = None):
    print(" >>>>>>>>>> Steps Per Epoch: ", steps_per_epoch)
    print(">>>>>> Constructing Neural Network...")
    
-   denseModel = Model(depth=args.depth, image_size = args.scale_size, lr_init = args.lr_init, kernels = args.kernels, kernel_size = args.kernel_size, expansion=args.expansion, class_0 = args.class_0, class_1 = args.class_1, drop_rate = drop_rate, drop_pattern = args.drop_pattern, train_or_test=isTrain)
+   denseModel = Model(depth=args.depth, image_size = args.scale_size, lr_init = args.lr_init, kernels = args.kernels, kernel_size = args.kernel_size, expansion=args.expansion, class_0 = args.class_0, class_1 = args.class_1, drop_rate = drop_rate, drop_pattern = args.drop_pattern, skip_norm = args.skip_norm, train_or_test=isTrain)
    
    if isTrain:
       print("Setting up training configuration: callbacks, validation checks and hyperparameter scheduling.")
@@ -499,7 +519,7 @@ def get_config(train_or_test, train_config = None, load_model = None):
             #HyperParamSetterWithFunc('learning_rate',
             #                         lambda e, x: x * float(0.1) if e % 15 == 0 and e > args.drop_2 else x),# (1+e)/(2*20) #ScheduledHyperParamSetter('learning_rate',[(args.drop_0, args.scale_lr*args.lr_0), (args.drop_1,  args.scale_lr*args.lr_1), (args.drop_2,  args.scale_lr*args.lr_2), (args.drop_3,  args.scale_lr*args.lr_3)]), # denote current hyperparameter)
             StatMonitorParamSetter('learning_rate', 'validation_error',
-                                   lambda x: x * 0.1, threshold=1e-20, last_k=20),
+                                   lambda x: x * 0.1, threshold=1e-10, last_k=15),
             MergeAllSummaries()
          ],
          model = denseModel,
@@ -530,10 +550,10 @@ def get_config(train_or_test, train_config = None, load_model = None):
       )
 
 class predictModel:
-   def __init__(self, config, data = None, image_size = None):
+   def __init__(self, config, data = None,  num_gpu = 0, image_size = None):
       self.test_data = data
       self.predictor = SimpleDatasetPredictor(config, self.test_data)
-      #MultiProcessDatasetPredictor(config, self.test_data, nr_proc=2, use_gpu=True)
+      #MultiProcessDatasetPredictor(config, self.test_data, nr_proc = num_gpu, use_gpu = True, ordered = True)
       
    def _get_inputs(self):
       return [InputDesc(tf.float32, [None, image_size, image_size, 3], 'input'),
@@ -554,7 +574,7 @@ class predictModel:
 if __name__ == '__main__':
    parser = argparse.ArgumentParser()
    parser.add_argument('--model_name',type= str, default='MODEL',help="Name to prepend on model during training")
-   parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.') 
+   parser.add_argument('--gpu', default=None, help='comma separated list of GPU(s) to use.') 
    parser.add_argument('--load', help='load model')
    parser.add_argument('--kernels',type=int, default=24, help='initial kernel channel depth. Number kernels.')
    parser.add_argument('--kernel_size',type=int, default=3, help='initial kernel window size')
@@ -572,7 +592,8 @@ if __name__ == '__main__':
    parser.add_argument('--batch_size',type=int, default=4,help='batch size')
    parser.add_argument('--depth',type=int, default=13, help='The depth of densenet')
    parser.add_argument('--drop_out',type=float, help='drop out rate')
-   parser.add_argument('--drop_pattern',type=int, help='drop layer every drop_pattern layer')
+   parser.add_argument('--drop_pattern',type=int, default=0, help='drop layer every drop_pattern layer')
+   parser.add_argument('--skip_norm',type=int, default=None, help='Do not use batchnorm every skip_norm layer e.g. (layer%skip_norm).')
    parser.add_argument('--max_epoch',type= int, default=256,help='max epoch')
    parser.add_argument('--tot',type= str, default='train',help=" 'train' or 'test'")
    parser.add_argument('--out_dir',type= str, default='../data/Unknowns/predictions/',help="img out dir")
@@ -606,9 +627,11 @@ if __name__ == '__main__':
       #from tensorpack.utils.gpu import get_num_gpu
       args.num_gpu = len(args.gpu.split(','))#max(get_num_gpu(),1)
       note = "Slurm assigns on DGX"
+      print("...")
+      print(">>>> NOTE!")
       print(" >>>> Hard assigning to all available gpu")
-   os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-   os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str,range(args.num_gpu)))#args.gpu
+      os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+      os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu#','.join(map(str,range(args.num_gpu)))#args.gpu
    
    if not args.tot:
       args.tot == 'train'
@@ -658,7 +681,10 @@ if __name__ == '__main__':
       data = get_data('test',image_size=args.image_size, scale_size = args.scale_size, scale = args.scale, multi_crop = args.multi_crop, crop_per_case = args.crop_per_case, normalize = args.aug_norm, shuffle = False,unknown_dir = args.unknown_dir, original_dir=args.original_dir)
       
       def classify_unknown(model_config, dp, args):
-         predictor = predictModel(config, data = dp, image_size = args.image_size)
+         if args.gpu:
+            args.num_gpu = len(args.gpu.split(',')) if args.num_gpu is None else args.num_gpu
+         
+         predictor = predictModel(config, data = dp, num_gpu = args.num_gpu, image_size = args.image_size)
          res, all_res = predictor.get_results()
          img_list = []
          prediction = []
@@ -726,7 +752,7 @@ if __name__ == '__main__':
                if not os.path.exists( path ):
                   os.makedirs( path )
                
-               path = path+'/predictions'+args.unknown_dir+'.txt'
+               path = path+'/graphX_predictions'+args.unknown_dir+'.txt'
                if os.path.exists(path):
                   append_write = 'a'
                   #write results to file                   
