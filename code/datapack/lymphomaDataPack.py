@@ -103,7 +103,7 @@ def read_lymphoma(filenames,  train_or_test = 'train', image_size = 448, scale_s
             crop_per_case = 1
         
         if bool(multi_crop) == False:
-            multi_crop = 1
+            multi_crop = 0
         
         print(">>>>>> will take ", str(crop_per_case)," images from each case for ",str(multi_crop), " crops.")
         print(">>>>>> Totaling crops: ", str(crop_per_case*multi_crop))
