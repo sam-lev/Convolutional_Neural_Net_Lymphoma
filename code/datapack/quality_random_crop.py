@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:8
 
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 #from skimage import io
 from PIL import Image
 
@@ -59,10 +59,10 @@ class quality_random_crop:
         hist, mu, sigma, var = gaussian_fit(image)
         rng = np.random.RandomState(10) 
         a = np.hstack((rng.normal(size=1000)))
-        plt.hist(a, bins='auto')
-        plt.title(r' mu=%.3f, \sigma=%.3f$' %(mu, sigma))
-        plt.show()
-
+        #plt.hist(a, bins='auto')
+        #plt.title(r' mu=%.3f, \sigma=%.3f$' %(mu, sigma))
+        #plt.show()
+    
     def tile_show(self):
         image=self.entire_image
         i = 1
