@@ -12,8 +12,7 @@ from os import makedirs
 #from threaded_generator import threaded_generator
 from time import time
 import sys
-
-#np.random.seed(101)
+np.random.seed(101)
 
 PATCH_SIZES = [224, 224] #[672,672]
 SCALES = [0.5]
@@ -34,123 +33,64 @@ class NormStainAug(imgaug.ImageAugmentor):
         super(NormStainAug, self).__init__()
         self._init(locals())
         
-    def reset_state(self):
-        super(NormStainAug, self).reset_state()
     
-    def get_transform(self, _):
-        return normalize_staining()
+    def get_transform(self, img):
+        return normalize_staining(img)
     
     def apply_coords(self, coords):
         return coords
     
-    def _get_augment_params(self, _):
-        return np.random.randint(100)
-    
-    def _augment(self, img, _):
-        p_holder = np.array([0])
-        t = self.get_transform(p_holder).apply_image(img)
+    def _augment(self, img):
+        t = self.get_transform(img)
         return t
 
-    def get_augment_params(self, _):
-        return np.random.randint(100)
-    
-    def augment(self, img, _):
-        p_holder = np.array([0])
-        t = self.get_transform(p_holder).apply_image(img)
-        return t
-    
-    #def reset_state(self):
-    #    super(NormStainAug, self).reset_state()
-            
 class ZoomAug(imgaug.ImageAugmentor):
-    def __init__(self, param = (10, None)):
+    def __init__(self, img, zoom=10, seed = None):
         super(ZoomAug, self).__init__()
-        self.zoom = zoom[0]
-        if param[1] is None:
-            self.seed = np.random.randint(2**32-1)
-        else:
-            self.seed = seed[1]
+        self.zoom = zoom
+        self.seed = seed
         self._init(locals())
         
-    def	reset_state(self):
-        super(ZoomAug, self).reset_state()
-        self.seed = np.random.randint(2**32-1)
-        
-    def get_transform(self, _):
-        return zoom_transform(self.zoom, self.seed)
+    def get_transform(self, img):
+        return zoom_transform(img, self.zoom, self.seed)
     
     def	apply_coords(self, coords):
         return coords
     
-    def _get_augment_params(self, _):
-        return (self.zoom, self.seed)
-    
-    def	_augment(self, img, param = (10, None)):
-        self.zoom = param[0]
-        self.seed = param[1]
-        p_holder = np.array([0])
-        t = self.get_transform(p_holder).apply_image(img)
-        return t
-
-    def get_augment_params(self, _):
-        return (self.zoom, np.random.randint(2**32-1))
-    
-    def	augment(self, img):
-        self.zoom, self.seed = get_augment_params(img)
-        p_holder = np.array([0])
-        t = self.get_transform(p_holder).apply_image(img)
+    def	_augment(self, img, zoom, seed=None):
+        self.zoom = zoom
+        self.seed = seed
+        t = self.get_transform(img, zoom, seed)
         return t
 
 class HematoEAug(imgaug.ImageAugmentor):
-    def __init__(self, param = (0.2, 2.3, None)):
+    def __init__(self, img, low=0.7, high=1.3, seed=None):
         super(HematoEAug, self).__init__()
-        self.low = param[0]
-        self.high = param[1]
-        self.seed = param[2]
+        self.img = img
+        self.low = low
+        self.high = high
+        self.seed = seed
         self._init(locals())
         
-    def	reset_state(self):
-        super(HematoEAug, self).reset_state()
-        self.seed = np.random.randint(2**32-1)
-    
-    def get_transform(self, _):
-        return hematoxylin_eosin_aug(self.low, self.high, self.seed)
+        
+    def get_transform(self, img):
+        return hematoxylin_eosin_aug(img, self.low, self.high, self.seed)
     
     def apply_coords(self, coords):
         return coords
     
-    def _get_augment_params(self, _):
-        self.seed = np.random.randint(2**32-1)
-        return (self.low, self.high, self.seed)
-    
-    def	_augment(self, img, param = (0.7, 1.3, None)):
-        self.low = param[0]
-        self.high = param[1]
-        if param[2] is None:
-            self.seed = np.random.randint(2**32-1)
-        else:
-            self.seed = param[2]
-        p_holder = np.array([0])
-        t = self.get_transform(p_holder).apply_image(img)
+    def	_augment(self, img, low=0.7, high=1.3, seed = None):
+        self.low = low
+        self.high = high
+        self.seed = seed
+        t = self.get_transform(img)
         return t
 
-    def get_augment_params(self, _):
-        self.seed = np.random.randint(2**32-1)
-        return (self.low, self.high, self.seed)
-    
-    def	augment(self, img):
-        self.low, self.high, self.seed = get_augment_params(img)
-        p_holder = np.array([0])
-        t = self.get_transform(p_holder).apply_image(img)
-        return t
-
-class normalize_staining(imgaug.Transform):
-    def __init__(self):
+class normalize_staining(imgaug.transform.ImageTransform):
+    def __init__():
         super(normalize_staining, self).__init__()
-        self._init(locals())
         
     def apply_image(self, img):
-        
         """
         Adopted from "Classification of breast cancer histology images using Convolutional Neural Networks",
         Teresa Araújo , Guilherme Aresta, Eduardo Castro, José Rouco, Paulo Aguiar, Catarina Eloy, António Polónia,
@@ -171,7 +111,7 @@ class normalize_staining(imgaug.Transform):
         
         h, w, c = img.shape
         img = img.reshape(h * w, c)
-        OD = -np.log((img.astype("uint16") + 1) / Io) #img.astype("uint16")
+        OD = -np.log((img.astype("uint16") + 1) / Io)
         ODhat = OD[(OD >= beta).all(axis=1)]
         W, V = np.linalg.eig(np.cov(ODhat, rowvar=False))
         
@@ -190,7 +130,7 @@ class normalize_staining(imgaug.Transform):
         HE = HE.T
         Y = OD.reshape(h * w, c).T
         
-        C = np.linalg.lstsq(HE, Y, rcond=None)
+        C = np.linalg.lstsq(HE, Y)
         maxC = np.percentile(C[0], 99, axis=1)
         
         C = C[0] / maxC[:, None]
@@ -203,13 +143,12 @@ class normalize_staining(imgaug.Transform):
     def apply_coords(self, coords):
         return coords
     
-class hematoxylin_eosin_aug(imgaug.Transform):
+class hematoxylin_eosin_aug(imgaug.transform.ImageTransform):
     def __init__(self, low=0.7, high=1.3, seed=None):
         super(hematoxylin_eosin_aug, self).__init__()
         self.low = low
         self.high = high
         self.seed = seed
-        self._init(locals())
         
     def apply_image(self, img):
         low = self.low
@@ -236,7 +175,7 @@ class hematoxylin_eosin_aug(imgaug.Transform):
         Io = 240
         
         h, w, c = img.shape
-        OD = -np.log10((img.astype("uint16") + 1.) / Io)#.astype("uint16")
+        OD = -np.log10((img.astype("uint16") + 1) / Io)
         C = np.dot(D, OD.reshape(h * w, c).T).T
         r = np.ones(3)
         r[:2] = np.random.RandomState(seed).uniform(low=low, high=high, size=2)
@@ -244,18 +183,16 @@ class hematoxylin_eosin_aug(imgaug.Transform):
         
         img_aug = Io * np.exp(-img_aug * np.log(10)) - 1
         img_aug = img_aug.reshape(h, w, c).clip(0, 255).astype("uint8")
-        
         return img_aug
     
     def apply_coords(self, coords):
         return coords
-
-class zoom_transform(imgaug.Transform):
+    
+class zoom_transform(imgaug.transform.ImageTransform):
     def __init__(self, zoom, seed = None):
         super(zoom_transform, self).__init__()
         self.zoom = zoom
         self.seed = seed
-        self._init(locals())
         
     def apply_image(self, img):
         zoom = self.zoom
