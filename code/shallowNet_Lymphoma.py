@@ -221,13 +221,12 @@ def get_data(train_or_test, shuffle = None, multi_crop = None, crop_per_case = N
        #ds = PrefetchData(ds, nr_prefetch = args.batch_size * args.num_gpu, nr_proc=args.num_gpu)
        ds = MultiThreadMapData(ds,
                                nr_thread=args.batch_size * args.num_gpu,
-                               map_func=lambda dp: [augmentor._augment(copy.deepcopy(dp[0]), param=((0.7, 1.3, np.random.randint(2**32-1)),
-                                                                                     (True, False, 0.5))),dp[1]],
+                               map_func=lambda dp: [augmentor._augment(copy.deepcopy(dp[0]))],
                                buffer_size=args.batch_size)
        ds = PrefetchDataZMQ(ds, nr_proc=1)#args.num_gpu)
        ds = BatchData(ds, batch_size, remainder=not isTrain)
     else:
-       ds = MapData(ds, lambda dp: [datapack.NormStainAug()._augment(copy.deepcopy(dp[0]),param=(0)),dp[1]])
+       ds = MapData(ds, lambda dp: [datapack.NormStainAug()._augment(dp[0],prms=(True)),dp[1]])#param=(0)),dp[1]])
        ds = BatchData(ds, batch_size, remainder=not isTrain)
     return ds
 
