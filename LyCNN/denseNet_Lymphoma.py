@@ -14,7 +14,7 @@ import sys
 
 # Personal Data Flow
 sys.path.append(os.getcwd())
-import datapack 
+import LyCNN.datapack as datapack
 
 from tensorpack import *
 from tensorpack.tfutils.symbolic_functions import *
@@ -56,6 +56,13 @@ python3 denseNet_Lymphoma.py --num_gpu 8 --tot train --model_name 8_gpu_d1_58_d2
 >> Predict Class of files in folder '../data/Unknon/' + unknown_dir 
 >> and write prediction to '../data/Unknown/'+unknown_dir+'/predictions/'
 python3 denseNet_Lymphoma.py --tot test --gpu 0,1 --batch_size 500 --model_name ep_134_unkown_A --load train_log/8_gpu_d1_58_d2_98_phase_3-first58-second98-max134/model-523136 --unknown_dir A
+
+"""
+
+"""
+DEPRICATED
+
+current model is depricated and requires tensorpack-0.9.0, tensorflow-gpu-1.14.0
 
 """
 
