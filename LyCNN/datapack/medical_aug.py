@@ -228,7 +228,7 @@ class normalize_staining(imgaug.transform.ImageTransform):
         Macenko et al., ISBI 2009
         """
         
-        def implementation2():
+        def implementation2(img):
             Io = 240.
             alpha = 1
             beta=0.15
