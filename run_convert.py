@@ -10,7 +10,7 @@ if ((len(sys.argv) > 1) and bool(int(sys.argv[1]))):
     Convert_Dataset_ZIDX(read_path=read_path, write_path=write_path)
 
 cat_sample ="/home/sam/anaconda3/lib/python3.7/site-packages/OpenVisus/datasets/cat/visus.idx"
-sample = os.path.join(write_path,"batch_data_SP-19-5085_2.idx")
+sample = os.path.join(write_path,"batch_data_SP-19-5085_0.idx")# "batch_data_case_2_dlbcl_247.idx")
 
 resolution = None if len(sys.argv) <= 2 else int(sys.argv[2])
 
