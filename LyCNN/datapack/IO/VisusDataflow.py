@@ -71,7 +71,7 @@ class WriteZOrder:
 		# for by slice approach
 		#for Z in range(0, depth):
 
-		data = np.transpose(self.image, [1,2,0])#img[Z, :, :]
+		data = self.image #np.transpose(self.image, [1,0,2])#img[Z, :, :]
 
 		slice_box = dataset.getLogicBox()#.getZSlab(Z, Z + 1)
 		if not (slice_box.size()[0] == dims[0] and slice_box.size()[1] == dims[1]):
