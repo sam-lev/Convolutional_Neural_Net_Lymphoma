@@ -6,8 +6,12 @@ import scikitplot as skplt
 from os import listdir
 from os.path import isfile, join
 
-bl_path = "./predictions/BL"#./exp_2_predictions/BL" # prediction_results/BL"#fourth_results/BL"#  full_training_predictions/BL" #
-dl_path = "./predictions/DLBCL"#./exp_2_predictions/DLBCL" # prediction_results/DLBCL"#fourth_results/DLBCL"#  full_training_predictions/DLBCL" #
+base_path = "./data/Predictions/Graph_XIII1104-143215/bn059"
+bl_path = join(base_path,"BL")
+dl_path = join(base_path,"DLBCL")
+
+un_bl = []
+un_dl = []
 BL_files = [join(bl_path,f) for f in listdir(bl_path) if isfile(join(bl_path, f)) and ("txt" in f or "rtf" in f or "rtfd" in f)]
 DL_files = [join(dl_path,f) for f in listdir(dl_path) if isfile(join(dl_path, f)) and ("txt" in f or "rtfd" in f  or "rtf" in f)]
 
@@ -16,7 +20,8 @@ def precision(tp, fp):
 def recall(tp, fn):
     return float(tp)/(tp+fn)
 def F1(pr, re):
-    return 2.0*((pr*re)/(pr+re))
+    beta = 0.5
+    return 2.0*((pr*re)/float(pr+re))
 def FP_rate(fp, tn):
     return float(fp)/(fp+tn)
 
@@ -37,8 +42,10 @@ pred_bl_pos = []
 thresh = np.linspace(0,1,10)
 F1_thresh =  np.zeros(len(thresh))
 num_neg = 0
+y_true = []
+y_pred = []
 for case in BL_files:
-
+    #print(">>>>>>>>>> File: ", case)
     f = open(case, "r")
     lines = f.readlines()[:-2]
     for line in lines:
@@ -56,19 +63,23 @@ for case in BL_files:
                 pbl = line.split('[')[1].split()[0]
         pbl = float(pbl)
         pdl = float(pdl)
+        #print(">>>> Pred bl: ", pbl)
+        #print(">>>> Pred dl: ", pdl)
         pred_dl_neg.append(pdl)
         pred_bl_pos.append(pbl)
-        if pbl > 0.5:
+        if pbl >= 0.5:
             TN.append(pbl)
+            y_true.append(0)
+            y_pred.append(0)
         else:
             FP.append(pdl)
+            y_true.append(0)
+            y_pred.append(1)
         #print(pbl, " ", pdl)
-print(len(TN))
-print(">>>")
-print(len(FP))
+
 num_pos=0        
 for case in DL_files:
-
+    #print(">>>>>FILE: ", case)
     f = open(case, "r")
     lines = f.readlines()[:-2]
     for line in lines:
@@ -85,12 +96,18 @@ for case in DL_files:
                 pbl = line.split('[')[1].split()[0]
         pbl = float(pbl)
         pdl = float(pdl)
+        #print(">>>> Pred bl: ", pbl)
+        #print(">>>> Pred dl: ", pdl)
         pred_dl_pos.append(pdl)
         pred_bl_neg.append(pbl)
-        if pdl > 0.5:
+        if pdl >= 0.5:
             TP.append(pdl)
+            y_true.append(1)
+            y_pred.append(1)
         else:
             FN.append(pbl)
+            y_true.append(1)
+            y_pred.append(0)
         #print(pbl, " ", pdl)
 
 fp_count = np.zeros(len(thresh))
@@ -155,14 +172,31 @@ print("Total Images: ",len(FN)+len(FP)+len(TP)+len(TN))
 print("----------")
 print("")
 print("----------")
-print("Max F1: ",np.max(F1_thresh))
-print("F1 score (+/- CI_95): ", F1(precision(len(TP),len(FP)), recall(len(TP),len(FN)))," +/- ",  ci_95(len(FP),len(FN),len(TP),len(TN)))
-print("----------")
+#print("Max F1: ",np.max(F1_thresh))
+print("      ____F1_Scores____ ")
+print("F1 score (binary) (+/- CI_95): ", F1(precision(len(TP),len(FP)), recall(len(TP),len(FN)))," +/- ",  ci_95(len(FP),len(FN),len(TP),len(TN)))
+print(" ")
+print("F1 Score (micro): ", metrics.f1_score(y_true, y_pred,average='micro'))
+print("F1 Score (macro): ", metrics.f1_score(y_true, y_pred,average='macro'))
+print("F1 Score (weighted): ", metrics.f1_score(y_true, y_pred,average='weighted'))
+print("----------------------")
+print("")
+print("Explanation of various F1 scores")
+print("'binary':")
+print("    Only report results for the class specified by pos_label. This is applicable only if targets (y_{true,pred}) are binary.")
+print("'micro': ")
+print("    Calculate metrics globally by counting the total true positives, false negatives and false positives.")
+print("'macro':")
+print("    Calculate metrics for each label, and find their unweighted mean. This does not take label imbalance into account.")
+print("'weighted':")
+print("    Calculate metrics for each label, and find their average weighted by support (the number of true instances for each label). This alters ‘macro’ to account for label imbalance; it can result in an F-score that is not between precision and recall.")
+print("")
+
 #print(DL_files,BL_files)
 
 #print(F1(precision(592.,147.),recall(592., 139.)))
-print('min(tp, tn, fp,fn) ',np.min(tp_count),' ',np.min(tn_count),' ',np.min(fp_count),' ',np.min(fn_count))
-print('max(tp,tn,fp,fn) ',np.max(tp_count),' ',np.max(tn_count),' ',np.max(fp_count),' ',np.max(fn_count))
+#print('min(tp, tn, fp,fn) ',np.min(tp_count),' ',np.min(tn_count),' ',np.min(fp_count),' ',np.min(fn_count))
+#print('max(tp,tn,fp,fn) ',np.max(tp_count),' ',np.max(tn_count),' ',np.max(fp_count),' ',np.max(fn_count))
 
 y_dl_true = list(np.ones(num_pos))+list(np.zeros(num_neg))
 y_dl_probas = pred_dl_pos+pred_dl_neg
@@ -175,8 +209,10 @@ fpr_bl, tpr_bl, threshold_bl = metrics.roc_curve(y_bl_true, y_bl_probas,pos_labe
 
 roc_auc_dl = metrics.auc(fpr_dl, tpr_dl)
 roc_auc_bl = metrics.auc(fpr_bl, tpr_bl)
-
+print("__________AUC__________")
 print("AUC DLBCL: ", roc_auc_dl)
+print("")
+print("_________________________")
 
 #roc_auc = metrics.auc(fp_rate, tp_rate)
 font = {'family' : 'Calibri',
@@ -186,8 +222,8 @@ font = {'family' : 'Calibri',
 matplotlib.rc('font', **font)
 
 #plt.title('ROC (fourth of training set)')
-plt.plot(fpr_dl, tpr_dl, color='mediumspringgreen', linewidth=1.3,linestyle=':',label = 'Accuracy (AUC) DLBCL = %0.2f' % roc_auc_dl)
-#plt.plot(fpr_bl, tpr_bl, color='mediumblue', linestyle='-.',linewidth=1.3,label = 'Accuracy (AUC) BL = %0.2f' % roc_auc_bl)
+plt.plot(fpr_dl, tpr_dl, color='mediumspringgreen', linewidth=1.3,linestyle=':',label = 'AUC DLBCL = %0.2f' % roc_auc_dl)
+#plt.plot(fpr_bl, tpr_bl, color='mediumblue', linestyle='-.',linewidth=1.3,label = 'AUC BL = %0.2f' % roc_auc_bl)
 plt.legend(loc = 'lower right')
 plt.plot([0, 1], [0, 1],color='darkgray',linestyle='dashed')
 plt.xlim([0, 1])
