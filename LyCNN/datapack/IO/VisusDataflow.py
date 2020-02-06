@@ -36,13 +36,12 @@ class WriteZOrder:
 		# numpy display is Z,Y,X
 		print("image shape ", self.image.shape)
 
-		height, width, depth = self.image.shape#[0], self.image.shape[1], self.image.shape[2]
-		img =  np.transpose(self.image, [2,0,1]) #self.image.reshape((height, width, 3)) #n
-		#img = np.zeros((depth,height,width),dtype=np.uint8)
+		height, width, depth = self.image.shape
+
+		#img =  np.transpose(self.image, [2,0,1])
+
 		#
-		print(img.shape)#np.zeros((depth, height, width), dtype=np.uint8)
-		#if not (img.shape[0] == depth and img.shape[1] == height and img.shape[2] == width):
-		#	raise Exception("Assert failed")
+		print(self.image.shape)
 
 		idx_name = idx_filename
 		print("image", idx_name, "has dimensions", width, height, depth)
@@ -51,7 +50,7 @@ class WriteZOrder:
 		offset_x = 0
 
 		# numpy dtype -> OpenVisus dtype
-		typestr = img.__array_interface__["typestr"]
+		typestr = self.image.__array_interface__["typestr"]
 		dtype = ov.DType(typestr[1] == "u", typestr[1] == "f", int(typestr[2]) * 8 )
 		dtype = ov.DType(3, dtype)
 		print("dtype written: ",dtype.toString())
@@ -69,11 +68,10 @@ class WriteZOrder:
 		access = dataset.createAccess()
 		if not dataset:
 			raise Exception("Assert failed")
-
+		# for by slice approach
 		#for Z in range(0, depth):
 
-		print("Processing slice %d" )#% Z)
-		data = np.transpose(img, [1,2,0])#img[Z, :, :]
+		data = np.transpose(self.image, [1,2,0])#img[Z, :, :]
 
 		slice_box = dataset.getLogicBox()#.getZSlab(Z, Z + 1)
 		if not (slice_box.size()[0] == dims[0] and slice_box.size()[1] == dims[1]):
