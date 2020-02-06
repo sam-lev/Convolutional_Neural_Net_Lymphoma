@@ -36,10 +36,13 @@ class WriteZOrder:
 		# numpy display is Z,Y,X
 		print("image shape ", self.image.shape)
 
-		height, width, depth = self.image.shape[0], self.image.shape[1], self.image.shape[2]
-		img = np.transpose(self.image, (2,0,1))#np.zeros((depth, height, width), dtype=np.uint8)
-		if not (img.shape[0] == depth and img.shape[1] == height and img.shape[2] == width):
-			raise Exception("Assert failed")
+		height, width, depth = self.image.shape#[0], self.image.shape[1], self.image.shape[2]
+		img =  np.transpose(self.image, [2,0,1]) #self.image.reshape((height, width, 3)) #n
+		#img = np.zeros((depth,height,width),dtype=np.uint8)
+		#
+		print(img.shape)#np.zeros((depth, height, width), dtype=np.uint8)
+		#if not (img.shape[0] == depth and img.shape[1] == height and img.shape[2] == width):
+		#	raise Exception("Assert failed")
 
 		idx_name = idx_filename
 		print("image", idx_name, "has dimensions", width, height, depth)
@@ -49,7 +52,9 @@ class WriteZOrder:
 
 		# numpy dtype -> OpenVisus dtype
 		typestr = img.__array_interface__["typestr"]
-		dtype = ov.DType(typestr[1] == "u", typestr[1] == "f", int(typestr[2]) * 8)
+		dtype = ov.DType(typestr[1] == "u", typestr[1] == "f", int(typestr[2]) * 8 )
+		dtype = ov.DType(3, dtype)
+		print("dtype written: ",dtype.toString())
 
 		dims = ov.PointNi(int(width + offset_x * depth), int(height),  int(depth))
 
@@ -65,35 +70,35 @@ class WriteZOrder:
 		if not dataset:
 			raise Exception("Assert failed")
 
-		for Z in range(0, depth):
+		#for Z in range(0, depth):
 
-			print("Processing slice %d" % Z)
-			data = img[Z,:, :]
+		print("Processing slice %d" )#% Z)
+		data = np.transpose(img, [1,2,0])#img[Z, :, :]
 
-			slice_box = dataset.getLogicBox().getZSlab(Z, Z + 1)
-			if not (slice_box.size()[0] == dims[0] and slice_box.size()[1] == dims[1]):
-				raise Exception("Assert failed")
+		slice_box = dataset.getLogicBox()#.getZSlab(Z, Z + 1)
+		if not (slice_box.size()[0] == dims[0] and slice_box.size()[1] == dims[1]):
+			raise Exception("Assert failed")
 
-			query = ov.BoxQuery(dataset, dataset.getDefaultField(), dataset.getDefaultTime(), ord('w'))
-			query.logic_box = slice_box
-			dataset.beginQuery(query)
-			if not query.isRunning():
-				raise Exception("Assert failed")
+		query = ov.BoxQuery(dataset, dataset.getDefaultField(), dataset.getDefaultTime(), ord('w'))
+		query.logic_box = slice_box
+		dataset.beginQuery(query)
+		if not query.isRunning():
+			raise Exception("Assert failed")
 
-			buffer = ov.Array(query.getNumberOfSamples(), query.field.dtype)
+		buffer = ov.Array(query.getNumberOfSamples(), query.field.dtype)
 
-			buffer.fillWithValue(0)
+		#buffer.fillWithValue(0)
 
-			fill = ov.Array.toNumPy(buffer, bSqueeze=True, bShareMem=True)
-			y1 = 0
-			y2 = height
-			x1 = offset_x * Z
-			x2 = x1 + width
-			fill[y1:y2, x1:x2] = data
+		fill = ov.Array.toNumPy(buffer, bSqueeze=True, bShareMem=True)
+		y1 = 0
+		y2 = height
+		x1 = 0# offset_x * Z
+		x2 = x1 + width
+		fill [0, y1:y2, x1:x2, :] = data
 
-			query.buffer = buffer
-			if not (dataset.executeQuery(access, query)):
-				raise Exception("Assert failed")
+		query.buffer = buffer
+		if not (dataset.executeQuery(access, query)):
+			raise Exception("Assert failed")
 
 
 		ov.DbModule.detach()
@@ -134,8 +139,16 @@ class ShowData:
 			dataset.executeQuery(access,query)
 			# transform the result of the query to a numpy array
 			data = ov.Array.toNumPy(query.buffer, bSqueeze=True, bShareMem=False)
-			if data.shape[0]<=3:
-				data = np.transpose(data,(1,2,0))
+			print("read data shape: ", data.shape)
+			if len(data.shape) > 3:
+				squeeze = np.zeros((data.shape[1], data.shape[2], data.shape[3]))
+				squeeze_0 = data[0, :, :, :] #np.squeeze(data[0, :, :, :], axis=0)
+				#squeeze_1 = data[1, :, :, :]
+				#squeeze_2 = data[2, :, :, :]
+				print(squeeze_0.shape)
+				data = squeeze_0
+			#if data.shape[0]<=3:
+			#	data = np.transpose(data,(1,2,0))
 			#why does it loose a dimention 3 color channel for small values
 			# one color channel for 22
 			# color changes for lower res
