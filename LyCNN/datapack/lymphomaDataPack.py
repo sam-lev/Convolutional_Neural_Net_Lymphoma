@@ -369,8 +369,6 @@ def get_filenames(dir, train_or_test = '', unknown_dir = None, idx = False):
         path, dirs, files_train = next(os.walk(os.path.join(dir)))
         file_count = len(files_train)
         filenames = [os.path.join(dir, batch) for batch in files_train]  #
-        for i in filenames:
-            print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&   ", i)
         print(">>>>>>>>>> Using ", str(file_count), " batched files.")
 
     if train_or_test == 'train':
