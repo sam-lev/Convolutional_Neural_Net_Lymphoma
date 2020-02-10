@@ -248,8 +248,8 @@ def read_write_idx_lymphoma(filenames, train_or_test='train', image_size=448, sc
             # resize to divisable format for convolutions
             img = data[k].astype("uint8")
             # make rgb feasible
-            #if min(img.shape) != img.shape[2]:
-            #    img = np.transpose(img, [1, 2, 0])
+            if img.shape[0] == 3:
+                img = np.transpose(img, [1, 2, 0])
             #if max(img.shape) != img.shape[0]:
             #    img = np.transpose(img, [2, 1, 0])
             img_og = copy.deepcopy(img)
@@ -355,7 +355,7 @@ def read_write_idx_lymphoma(filenames, train_or_test='train', image_size=448, sc
                     # img = copy.deepcopy(img_og)
 
         print(">>>> Total crops observed: ", total_crops)
-        return (ret, class_0, class_1, unique_samples)
+    return (ret, class_0, class_1, unique_samples)
 
 
 
@@ -364,11 +364,13 @@ def get_filenames(dir, train_or_test = '', unknown_dir = None, idx = False):
 
     ## Need to write 'read idx filenames!
 
-    if not train_or_test:
+    if train_or_test == '':
         print("loading passed directy as training dataflow")
         path, dirs, files_train = next(os.walk(os.path.join(dir)))
         file_count = len(files_train)
         filenames = [os.path.join(dir, batch) for batch in files_train]  #
+        for i in filenames:
+            print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&   ", i)
         print(">>>>>>>>>> Using ", str(file_count), " batched files.")
 
     if train_or_test == 'train':
