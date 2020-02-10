@@ -11,7 +11,8 @@ class Convert_Dataset_ZIDX:
     def __init__(self, read_path=None, write_path=None):
 
         self.dataset = lymphoma2ZIDX(train_or_test='', multi_crop = 2, shuffle = False
-                                              , dir=read_path,idx_filepath=write_path)
+                                     , dir=read_path,idx_filepath=write_path
+                                     , mode='w')
         #ds = datapack.lymphoma2('train', multi_crop = False, shuffle = False, dir='../data/playground')
 
         self.batch_size = self.dataset.size()

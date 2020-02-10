@@ -191,25 +191,36 @@ def read_lymphoma(filenames,  train_or_test = 'train', image_size = 448, scale_s
 # filling order for controllable resolution
 def read_write_idx_lymphoma(filenames, train_or_test='train', image_size=448, scale_size=224, scale=2, multi_crop=0
                             ,crop_per_case=None, normalize=None, original_dir=None
-                            , write_crop=True, idx_filepath=''):
+                            , write_crop=True, idx_filepath='', mode=None ):
     num_show = 5
     ret = []
     class_0 = 0
     class_1 = 0
     total_crops = 0
     unique_samples = 0
+    idx_samples = []
+    idx_labels = []
     for fname in filenames:
+        if mode == 'w':
+            with open(fname, 'rb') as fo:
+                try:
+                    dic = pickle.load(fo)
+                except UnicodeDecodeError:  # python 3.x
+                    fo.seek(0)
+                    dic = pickle.load(fo, encoding='latin1')
+            data = dic['data']
+            label = dic['labels']
+            fo.close()
 
-        with open(fname, 'rb') as fo:
-            try:
-                dic = pickle.load(fo)
-            except UnicodeDecodeError:  # python 3.x
-                fo.seek(0)
-                dic = pickle.load(fo, encoding='latin1')
-
-        data = dic['data']
-        label = dic['labels']
-        fo.close()
+        if mode == 'r':
+            idx_sample = VisusDataflow.ReadData(data=fname, load=True)
+            idx_samples.append(idx_sample.data)
+            idx_labels.append(int(str(1) in fname.split('~')[-1]))
+            #continue collecting from folder
+            if fname != filenames[-1]:
+                continue
+            data = idx_samples
+            label = idx_labels
 
         crop_count = 0
         unique_samples += len(data)
@@ -228,118 +239,131 @@ def read_write_idx_lymphoma(filenames, train_or_test='train', image_size=448, sc
         # class for writing images into IDX format
         # with z space filling order for parameter based
         # resolution on read
-        visusWriter = VisusDataflow.WriteZOrder()
-        if not os.path.exists(idx_filepath):
-            os.mkdir(idx_filepath)
+        if mode == 'w':
+            visusWriter = VisusDataflow.WriteZOrder()
+            if not os.path.exists(idx_filepath):
+                os.mkdir(idx_filepath)
 
         for k in range(len(data)):  # part):
             # resize to divisable format for convolutions
             img = data[k].astype("uint8")
             # make rgb feasible
-            img = np.transpose(img, [1, 2, 0])
+            #if min(img.shape) != img.shape[2]:
+            #    img = np.transpose(img, [1, 2, 0])
+            #if max(img.shape) != img.shape[0]:
+            #    img = np.transpose(img, [2, 1, 0])
             img_og = copy.deepcopy(img)
-            if not write_crop:
+
+
+            if mode == 'w':
                 s = ""
-                idx_filename = s.join(fname.split('.')[:-1]) + '_' + str(k) + '.idx'
+                idx_filename = fname.split('/')[-1].split('.')[0] + '_' + str(k) + '~' + str(label[k]) + '.idx'
+                #print(os.path.join(idx_filepath, idx_fname))
                 visusWriter.convert_image(image=copy.deepcopy(img_og),idx_filename=os.path.join(idx_filepath,idx_filename))
 
 
 
+            if mode == 'r':
+                cropsize = (
+                np.max(np.array(img.shape)), np.max(np.array(img.shape)[np.array(img.shape) < np.max(np.array(img.shape))]),
+                3)
+                print(" >>>>>>> &&&&& : ",image_size)
+                if image_size is None:
+                    print(" >>>>> No scaling will be performed")
+                    #image_size = cropsize[1]#img.shape[0]
+                #if scale_size is None:
+                #    scaleSize = img.shape[0], img.shape[1]#image_size, image_size  # 224*scale,224*scale
+                #    imSize = None#image_size  # image_size*scale #224
+                #else:
+                #    scaleSize = image_size, image_size  # scale_size,scale_size
+                #    imSize = image_size
+                # randPos = rnd.choice([0, 50, 100, 200, 300])
+                # img = data[k][:, randPos:(randPos+imSize), randPos:(randPos+imSize)] #:32, :32] #size currently (927,1276,3)
 
-            cropsize = (
-            np.max(np.array(img.shape)), np.max(np.array(img.shape)[np.array(img.shape) < np.max(np.array(img.shape))]),
-            3)
-            if image_size is None:
-                image_size = img.shape[0]
-            if scale_size is None:
-                scaleSize = image_size, image_size  # 224*scale,224*scale
-                imSize = image_size  # image_size*scale #224
-            else:
-                scaleSize = image_size, image_size  # scale_size,scale_size
-                imSize = image_size
-            # randPos = rnd.choice([0, 50, 100, 200, 300])
-            # img = data[k][:, randPos:(randPos+imSize), randPos:(randPos+imSize)] #:32, :32] #size currently (927,1276,3)
+                if original_dir:
+                    if not os.path.exists(original_dir):
+                        os.mkdirs(original_dir)
+                    save_original(data[k][:, :, :], save_dir=original_dir, name=str(k))
 
-            if original_dir:
-                if not os.path.exists(original_dir):
-                    os.mkdirs(original_dir)
-                save_original(data[k][:, :, :], save_dir=original_dir, name=k)
-
-            ##quality_cropper = quality_random_crop(data[k][:,:, :],imSize)
-            ##img = quality_cropper.random_crop_select()
-
-
-
-            aspect_ratio = min(img.shape[1] / float(img.shape[0]), img.shape[0] / float(img.shape[1]))
-            #acc_scaleSize = (int(scaleSize[0] * aspect_ratio), scaleSize[1]) if img.shape[0] < img.shape[1] else (
-            #scaleSize[0], int(aspect_ratio * scaleSize[1]))
-            #W = int(imSize * img.shape[1] / float(img.shape[0]))
-            #H = int(imSize * img.shape[0] / float(img.shape[1]))
-
-            # print(" True size after scaling to preserve aspect ratio: ", scaleSize)
-            # print("larger crop size: ", W," ",H)
-
-            multi_crop_ = 1
-            if crop_count < crop_per_case:
-                multi_crop_ = multi_crop + 1
-                crop_count += 1
-            for tile in range(multi_crop_):
-                if multi_crop_ != 1:
-                    total_crops += 1
-                start_w = [100, 300, 500, 700][tile] if multi_crop_ <= 4 else [100, 200, 300, 400, 500, 600][tile]
-                start_h = [400, 400, 400, 400][tile] if multi_crop_ <= 4 else [400, 400, 400, 400, 400, 400][tile]
-
-                copy_func = copy.deepcopy if multi_crop_ != 1 else lambda x: x
-                img_crop = copy.deepcopy(img_og)
-
-                img_crop = img_crop[start_w:(start_w + 2 * image_size), start_h:(start_h + 2 * image_size), :]
-
-                # write crop in IDX file format in
-                # Z space filling order for parameter based
-                # resolutuion on read
-                if write_crop:
-                    #im_crop = np.transpose(img_og, [2, 0, 1])
-                    s=""
-                    idx_fname = fname.split('/')[-1].split('.')[0]+'_'+str(k)+'.idx'
-                    print(os.path.join(idx_filepath,idx_fname))
-                    visusWriter.convert_image(image=img_crop, idx_filename=os.path.join(idx_filepath,idx_fname))
-
-                    #im_crop = np.transpose(img_og, [1, 2, 0])
-                # img_stack = np.expand_dims( img_crop, axis=0)
-
-                img_crop = Image.fromarray(img_crop, 'RGB')
-                #img_crop.show()
-                #import sys
-                #sys.exit(0)
-                img_crop = img_crop.resize((image_size, image_size), Image.ANTIALIAS)
-                img_crop = np.array(img_crop)
-                img_crop = img_crop.reshape((image_size, image_size, 3))  # .transpose(0,3,1,2)
-
-                # to place as nd array for tensorflow and augmentors
-                if label[k] == 0:
-                    # label[k] = 0.1
-                    class_0 += 1
-                elif label[k] == 1:
-                    # label[k] = 0.9
-                    class_1 += 1
-
-                if label[k] != 0 and label[k] != 1:
-                    for i in range(20):
-                        print(" >>>>>>>>>>>>>> LABELING INCORRECT> VALUE: ", label[k])
-
-                if normalize:
-                    img_crop = normalize_staining().apply_image(img_crop)
-
-                ret.append([img_crop.astype("uint8"), label[k]])
-                # img = copy.deepcopy(img_og)
-
-    print(">>>> Total crops observed: ", total_crops)
-    return (ret, class_0, class_1, unique_samples)
+                ##quality_cropper = quality_random_crop(data[k][:,:, :],imSize)
+                ##img = quality_cropper.random_crop_select()
 
 
 
-def get_filenames(dir, train_or_test = '', unknown_dir = None):
+                aspect_ratio = min(img.shape[1] / float(img.shape[0]), img.shape[0] / float(img.shape[1]))
+                #acc_scaleSize = (int(scaleSize[0] * aspect_ratio), scaleSize[1]) if img.shape[0] < img.shape[1] else (
+                #scaleSize[0], int(aspect_ratio * scaleSize[1]))
+                #W = int(imSize * img.shape[1] / float(img.shape[0]))
+                #H = int(imSize * img.shape[0] / float(img.shape[1]))
+
+                # print(" True size after scaling to preserve aspect ratio: ", scaleSize)
+                # print("larger crop size: ", W," ",H)
+
+                multi_crop_ = 1
+                if crop_count < crop_per_case:
+                    multi_crop_ = multi_crop + 1
+                    crop_count += 1
+                for tile in range(multi_crop_):
+                    if multi_crop_ != 1:
+                        total_crops += 1
+                    start_w = [100, 300, 500, 700][tile] if multi_crop_ <= 4 else [100, 200, 300, 400, 500, 600][tile]
+                    start_h = [400, 400, 400, 400][tile] if multi_crop_ <= 4 else [400, 400, 400, 400, 400, 400][tile]
+
+                    copy_func = copy.deepcopy if multi_crop_ != 1 else lambda x: x
+                    img_crop = copy.deepcopy(img_og)
+
+                    if image_size is not None:
+                        img_crop = img_crop[start_w:(start_w + 2 * image_size), start_h:(start_h + 2 * image_size), :]
+
+                    # write crop in IDX file format in
+                    # Z space filling order for parameter based
+                    # resolutuion on read
+                    if False and write_crop and mode == 'w':
+                        #im_crop = np.transpose(img_og, [2, 0, 1])
+                        s=""
+                        idx_fname = fname.split('/')[-1].split('.')[0]+'_'+str(k)+'~'+str(label[k])+'.idx'
+                        print(os.path.join(idx_filepath,idx_fname))
+                        visusWriter.convert_image(image=img_crop, idx_filename=os.path.join(idx_filepath,idx_fname))
+
+                        #im_crop = np.transpose(img_og, [1, 2, 0])
+                    # img_stack = np.expand_dims( img_crop, axis=0)
+                    if image_size is not None:
+                        img_crop = Image.fromarray(img_crop, 'RGB')
+                        #img_crop.show()
+                        #import sys
+                        #sys.exit(0)
+                        img_crop = img_crop.resize((image_size, image_size), Image.ANTIALIAS)
+                        img_crop = np.array(img_crop)
+                        img_crop = img_crop.reshape((image_size, image_size, 3))  # .transpose(0,3,1,2)
+
+                    # to place as nd array for tensorflow and augmentors
+                    if label[k] == 0:
+                        # label[k] = 0.1
+                        class_0 += 1
+                    elif label[k] == 1:
+                        # label[k] = 0.9
+                        class_1 += 1
+
+                    if label[k] != 0 and label[k] != 1:
+                        for i in range(20):
+                            print(" >>>>>>>>>>>>>> LABELING INCORRECT> VALUE: ", label[k])
+
+                    if normalize:
+                        img_crop = normalize_staining().apply_image(img_crop)
+
+                    ret.append([img_crop.astype("uint8"), label[k]])
+                    # img = copy.deepcopy(img_og)
+
+        print(">>>> Total crops observed: ", total_crops)
+        return (ret, class_0, class_1, unique_samples)
+
+
+
+def get_filenames(dir, train_or_test = '', unknown_dir = None, idx = False):
     filenames = []
+
+    ## Need to write 'read idx filenames!
+
     if not train_or_test:
         print("loading passed directy as training dataflow")
         path, dirs, files_train = next(os.walk(os.path.join(dir)))
@@ -352,7 +376,7 @@ def get_filenames(dir, train_or_test = '', unknown_dir = None):
         file_count = len(files_train)
         filenames = [os.path.join(dir, 'train', batch) for batch in files_train]#
         print( ">>>>>>>>>> Using ", str(file_count), " batched files.")
-    
+
     if train_or_test == 'val':
         path_val, dirs_val, files_val = next(os.walk(os.path.join(dir, 'test')))
         file_count_val = len(files_val)
@@ -374,7 +398,7 @@ class lymphomaBase( RNGDataFlow ):
     def __init__(self, train_or_test, image_size = None, scale_size = None
                  , scale = 2, multi_crop=None, crop_per_case = None, normalize = 0
                  , shuffle=None, dir=None, lymphoma_num_classes=2,unknown_dir = None
-                 , original_dir=None, write_crop=True, idx_filepath=None):
+                 , original_dir=None, write_crop=True, idx_filepath=None, mode=None):
 
         assert train_or_test in ['train', 'test', 'val', '']
         assert lymphoma_num_classes == 2 or lymphoma_num_classes == 10
@@ -413,18 +437,19 @@ class lymphomaBase( RNGDataFlow ):
         self.image_size = image_size
         self.scale_size = scale_size
         
-        print(">> reading in files.")
+        print(">> reading in files from: ", original_dir)
         if idx_filepath is None:
             data = read_lymphoma(self.fs, train_or_test = self.train_or_test
                                  , image_size = self.image_size, scale_size = self.scale_size
                                  , scale = self.scale, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case
                                  , normalize = self.normalize, original_dir=original_dir) #different classes changes here ect..
         else:
+            print(" >>>> writing idx files to: ", idx_filepath)
             data = read_write_idx_lymphoma(self.fs, train_or_test = self.train_or_test
                                  , image_size = self.image_size, scale_size = self.scale_size
                                  , scale = self.scale, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case
                                  , normalize = self.normalize, original_dir=original_dir
-                                 ,write_crop=write_crop, idx_filepath=idx_filepath) #different classes changes here ect..
+                                 ,write_crop=write_crop, idx_filepath=idx_filepath, mode=mode) #different classes changes here ect..
         self.data = data[0]
         self.class_0 = data[1]
         self.class_1 = data[2]
@@ -530,13 +555,17 @@ class lymphoma2ZIDX(lymphomaBase):
 
     def __init__(self, train_or_test, image_size=None, scale_size=None, scale=None, multi_crop=None, crop_per_case=None,
                  normalize=None, shuffle=None, dir=None, unknown_dir=None, original_dir=None
-                 ,idx_filepath=None):
+                 ,idx_filepath=None, mode=None):
 
         """
         Args:
             train_or_test (str): either 'train' or 'test'.
             shuffle (bool): shuffle the dataset.
         """
+        if mode is None:
+            print("no read or write mode provided. Assuming read ('r')")
+            mode = 'r'
+
         if shuffle == None and train_or_test == 'train':
             shuffle = True
         elif shuffle == None and train_or_test == 'test':
@@ -544,7 +573,7 @@ class lymphoma2ZIDX(lymphomaBase):
         self.shuffle = shuffle
 
         if normalize is None:
-            normalize = 1
+            normalize = 0
         self.normalize = bool(normalize)
 
         if multi_crop == None:
@@ -561,7 +590,7 @@ class lymphoma2ZIDX(lymphomaBase):
                                         , scale=self.scale, multi_crop=self.multi_crop, crop_per_case=self.crop_per_case
                                         , normalize=self.normalize, shuffle=self.shuffle, dir=dir,
                                         lymphoma_num_classes=2, unknown_dir=unknown_dir, original_dir=original_dir
-                                            ,idx_filepath=idx_filepath)
+                                            ,idx_filepath=idx_filepath, mode=mode)
 
 
 if __name__ == '__main__':

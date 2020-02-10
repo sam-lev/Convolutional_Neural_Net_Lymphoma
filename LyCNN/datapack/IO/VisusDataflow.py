@@ -108,10 +108,69 @@ class WriteZOrder:
 # function to plot the image data with matplotlib
 # optional parameters: colormap, existing plot to reuse (for more interactivity)
 class ShowData:
-	def __init__(self, data, resolution = None, load=True, cmap=None, plot=None, print_attr=None):
+	def __init__(self, data, resolution = None, load=False, cmap=None, plot=None, print_attr=None):
 		self.showData(data=data, resolution=resolution, load=load, cmap=cmap, plot=plot, print_attr = print_attr)
 
-	def showData(self, data,  resolution, load=False, cmap=None, plot=None, print_attr=None):
+	def readData(self, data,  resolution, load, print_attr):
+		ov.DbModule.attach()
+		dataset = ov.LoadDataset(data)
+		#world_dataset = ov.LoadDataset("http://atlantis.sci.utah.edu/mod_visus?dataset=BlueMarble")
+
+		access = dataset.createAccess()
+		if not dataset:
+			raise Exception("Assert failed")
+		if print_attr is not None:
+			print( "size ", dataset.getLogicBox().toString())
+			print("loaded dtype: ",dataset.getDefaultField().dtype.toString())
+			print( "max resolution: " , dataset.getMaxResolution())
+		# define a box query to fetch data from a certain dataset, field and timestep
+		query=ov.BoxQuery(dataset, dataset.getDefaultField(), dataset.getDefaultTime(), ord('r'))
+		logic_box = dataset.getLogicBox()
+		# set the bounding box for our query
+		query.logic_box=logic_box
+		# set the resolution
+		resolution = resolution if resolution is not None else dataset.getMaxResolution()
+		query.end_resolutions.push_back(resolution)
+		# prepare and execute the query
+		dataset.beginQuery(query)
+		dataset.executeQuery(access,query)
+		# transform the result of the query to a numpy array
+		data = ov.Array.toNumPy(query.buffer, bSqueeze=True, bShareMem=False)
+		print("read data shape: ", data.shape)
+		if len(data.shape) > 3:
+			squeeze = np.zeros((data.shape[1], data.shape[2], data.shape[3]))
+			squeeze_0 = data[0, :, :, :] #np.squeeze(data[0, :, :, :], axis=0)
+			#squeeze_1 = data[1, :, :, :]
+			#squeeze_2 = data[2, :, :, :]
+			print(squeeze_0.shape)
+			data = squeeze_0
+		return data
+		#if data.shape[0]<=3:
+		#	data = np.transpose(data,(1,2,0))
+		#why does it loose a dimention 3 color channel for small values
+		# one color channel for 22
+		# color changes for lower res
+
+	def showData(self, data,  resolution, load, cmap, plot, print_attr):
+		if load:
+			data = self.readData( data,  resolution, load,  print_attr)
+		if (plot == None or cmap != None):
+			fig = plt.figure(figsize=(7, 7))
+			plot = plt.imshow(data, origin='lower', cmap=cmap)
+			plt.show()
+			return plot
+		else:
+			plot.set_data(data)
+			plt.show()
+			return plot
+
+		ov.DbModule.detach()
+
+class ReadData:
+	def __init__(self, data,  resolution=None, load=False, print_attr=None):
+		self.readData(data,  resolution, load, print_attr)
+
+	def readData(self, data,  resolution, load, print_attr):
 		ov.DbModule.attach()
 		if load:
 			dataset = ov.LoadDataset(data)
@@ -124,6 +183,8 @@ class ShowData:
 				print( "size ", dataset.getLogicBox().toString())
 				print("loaded dtype: ",dataset.getDefaultField().dtype.toString())
 				print( "max resolution: " , dataset.getMaxResolution())
+			if resolution is None:
+				resolution = dataset.getMaxResolution()
 			# define a box query to fetch data from a certain dataset, field and timestep
 			query=ov.BoxQuery(dataset, dataset.getDefaultField(), dataset.getDefaultTime(), ord('r'))
 			logic_box = dataset.getLogicBox()
@@ -145,21 +206,11 @@ class ShowData:
 				#squeeze_2 = data[2, :, :, :]
 				print(squeeze_0.shape)
 				data = squeeze_0
+			ov.DbModule.detach()
+			self.data = data
+			return data
 			#if data.shape[0]<=3:
 			#	data = np.transpose(data,(1,2,0))
 			#why does it loose a dimention 3 color channel for small values
 			# one color channel for 22
 			# color changes for lower res
-
-		#
-		if (plot == None or cmap != None):
-			fig = plt.figure(figsize=(7, 7))
-			plot = plt.imshow(data, origin='lower', cmap=cmap)
-			plt.show()
-			return plot
-		else:
-			plot.set_data(data)
-			plt.show()
-			return plot
-
-		ov.DbModule.detach()
