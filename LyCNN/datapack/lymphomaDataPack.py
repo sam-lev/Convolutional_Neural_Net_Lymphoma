@@ -513,7 +513,9 @@ class lymphoma2(lymphomaBase):
     image is 900x900x3 in the range [0,255].
     label is an int.
     """
-    def __init__(self, train_or_test, image_size = None, scale_size = None, scale = None, multi_crop= None, crop_per_case = None, normalize = None, shuffle= None, dir=None, unknown_dir=None,original_dir=None, idx=False):
+    def __init__(self, train_or_test, image_size = None, scale_size = None, scale = None
+                 , multi_crop= None, crop_per_case = None, normalize = None, shuffle= None
+                 , dir=None, unknown_dir=None,original_dir=None, idx=False):
 
         """
         Args:
