@@ -15,7 +15,7 @@ import io
 
 # Personal Data Flow
 sys.path.append(os.getcwd())
-import datapack 
+import LyCNN.datapack as datapack
 
 from tensorpack import *
 from tensorpack.models import BatchNorm
