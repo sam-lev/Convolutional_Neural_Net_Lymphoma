@@ -572,7 +572,7 @@ class predictModel:
       #MultiProcessDatasetPredictor(config, self.test_data, nr_proc = num_gpu, use_gpu = True, ordered = True)
       
    def _get_inputs(self):
-      return [InputDesc(tf.float32, [None, image_size, image_size, 3], 'input'),
+      return [InputDesc(tf.float32, [None, args.image_size, args.image_size, 3], 'input'),
               InputDesc(tf.int32, [None], 'label')
       ]
    
