@@ -5,12 +5,24 @@ from LyCNN.datapack.IO.Convert_ZIDX import Convert_Dataset_ZIDX
 from LyCNN.datapack.IO.VisusDataflow import ShowData
 from LyCNN.datapack.IO.VisusDataflow import ReadData
 from LyCNN.datapack.lymphomaDataPack import lymphoma2ZIDX
-read_path = "/home/sam/Documents/PhD/Research/Convolutional_Neural_Net_Lymphoma/data/train"
-write_path = "/home/sam/Documents/PhD/Research/Convolutional_Neural_Net_Lymphoma/data/train/train_idx"
+
+base = "/home/sci/samlev/Convolutional_Neural_Net_Lymphoma"
+unknown_path = os.path.join(base, "data", "Unknown")
+unknown_path, unknown_dirs, files_train = next(os.walk(os.path.join(unknown_path)))
+
+test_path = "/home/sci/samlev/Convolutional_Neural_Net_Lymphoma/data/test"#"/home/sam/Documents/PhD/Research/Convolutional_Neural_Net_Lymphoma/data/train"
 
 
 if ((len(sys.argv) > 1) and bool(int(sys.argv[1]))):
-    Convert_Dataset_ZIDX(read_path=read_path, write_path=write_path)
+    for dir in unknown_dirs:
+        read_path = os.path.join(unknown_path,dir)
+        write_path = os.path.join(read_path,read_path.split('/')[-1]+'_idx')
+        Convert_Dataset_ZIDX(read_path=read_path, write_path=write_path)
+    print(" >> ")
+    print(" >> ")
+    print(" >>>>>    Done with Conversion. Testing results: ")
+    print(" >> ")
+    print(" >> ")
 
 cat_sample ="/home/sam/anaconda3/lib/python3.7/site-packages/OpenVisus/datasets/cat/visus.idx"
 sample = os.path.join(write_path,"batch_data_SP-19-5085_0~1.idx")#batch_data_SP-19-5085_0.idx")# "batch_data_case_2_dlbcl_247.idx")
