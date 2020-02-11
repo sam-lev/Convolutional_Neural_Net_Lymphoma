@@ -440,7 +440,7 @@ class lymphomaBase( RNGDataFlow ):
         self.scale_size = scale_size
         
         print(">> reading in files from: ", original_dir)
-        if idx_filepath is None:
+        if idx_filepath is None or (idx is None and mode is None):
             data = read_lymphoma(self.fs, train_or_test = self.train_or_test
                                  , image_size = self.image_size, scale_size = self.scale_size
                                  , scale = self.scale, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case

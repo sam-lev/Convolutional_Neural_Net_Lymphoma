@@ -357,7 +357,7 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
                            , unknown_dir = unknown_dir,original_dir=original_dir)"""
    ds = datapack.lymphoma2ZIDX(train_or_test, image_size=image_size, scale_size=scale_size
                            , scale=scale, multi_crop=multi_crop, crop_per_case=crop_per_case
-                           , normalize=normalize, shuffle=shuffle, dir='../data'
+                           , normalize=normalize, shuffle=shuffle, dir='./data'
                            , unknown_dir=unknown_dir, original_dir=original_dir
                                , idx=True, mode='r')
    args.unique_samples = ds.unique_samples
