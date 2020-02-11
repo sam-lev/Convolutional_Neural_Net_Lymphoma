@@ -372,15 +372,15 @@ def get_filenames(dir, train_or_test = '', unknown_dir = None, idx = False):
         print(">>>>>>>>>> Using ", str(file_count), " batched files.")
 
     if train_or_test == 'train':
-        path, dirs, files_train = next(os.walk(os.path.join(dir, 'train')))
+        path, dirs, files_train = next(os.walk(os.path.join(dir, 'train'))) if not idx else next(os.walk(os.path.join(dir, 'train','train_idx')))
         file_count = len(files_train)
-        filenames = [os.path.join(dir, 'train', batch) for batch in files_train]#
+        filenames = [os.path.join(dir, 'train', batch) for batch in files_train] if not idx else [os.path.join(dir, 'train', 'train_idx',batch) for batch in files_train]
         print( ">>>>>>>>>> Using ", str(file_count), " batched files.")
 
     if train_or_test == 'val':
-        path_val, dirs_val, files_val = next(os.walk(os.path.join(dir, 'test')))
+        path_val, dirs_val, files_val = next(os.walk(os.path.join(dir, 'test'))) if not idx else next(os.walk(os.path.join(dir, 'test','test_idx')))
         file_count_val = len(files_val)
-        filenames = [os.path.join(dir, 'test',batch) for batch in files_val]#
+        filenames = [os.path.join(dir, 'test',batch) for batch in files_val] if not idx else [os.path.join(dir, 'test','test_idx',batch) for batch in files_val]#
         print(">>>>>>>>>> Using ", str(file_count_val), " validation batch files.")
     else:
         if unknown_dir:
@@ -398,7 +398,8 @@ class lymphomaBase( RNGDataFlow ):
     def __init__(self, train_or_test, image_size = None, scale_size = None
                  , scale = 2, multi_crop=None, crop_per_case = None, normalize = 0
                  , shuffle=None, dir=None, lymphoma_num_classes=2,unknown_dir = None
-                 , original_dir=None, write_crop=True, idx_filepath=None, mode=None):
+                 , original_dir=None, write_crop=True, idx_filepath=None, mode=None
+                 , idx=False):
 
         assert train_or_test in ['train', 'test', 'val', '']
         assert lymphoma_num_classes == 2 or lymphoma_num_classes == 10
@@ -422,7 +423,7 @@ class lymphomaBase( RNGDataFlow ):
         
         if dir is None:
             dir = '../data' #and changes in behavor for more classes here
-        fnames = get_filenames(dir, train_or_test, unknown_dir=unknown_dir)
+        fnames = get_filenames(dir, train_or_test, unknown_dir=unknown_dir, idx=idx)
         
         self.fs = fnames
 
@@ -512,7 +513,7 @@ class lymphoma2(lymphomaBase):
     image is 900x900x3 in the range [0,255].
     label is an int.
     """
-    def __init__(self, train_or_test, image_size = None, scale_size = None, scale = None, multi_crop= None, crop_per_case = None, normalize = None, shuffle= None, dir=None, unknown_dir=None,original_dir=None):
+    def __init__(self, train_or_test, image_size = None, scale_size = None, scale = None, multi_crop= None, crop_per_case = None, normalize = None, shuffle= None, dir=None, unknown_dir=None,original_dir=None, idx=False):
 
         """
         Args:
@@ -541,7 +542,8 @@ class lymphoma2(lymphomaBase):
         
         super(lymphoma2, self).__init__(train_or_test, image_size = self.image_size, scale_size = self.scale_size
                                         , scale=self.scale, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case
-                                        , normalize = self.normalize, shuffle = self.shuffle, dir=dir, lymphoma_num_classes = 2,unknown_dir = unknown_dir, original_dir = original_dir)
+                                        , normalize = self.normalize, shuffle = self.shuffle, dir=dir, lymphoma_num_classes = 2
+                                        ,unknown_dir = unknown_dir, original_dir = original_dir, idx=False)
 
 # data converter for dataflow into IDX format
 # written to disk in Z space filling order
@@ -555,7 +557,7 @@ class lymphoma2ZIDX(lymphomaBase):
 
     def __init__(self, train_or_test, image_size=None, scale_size=None, scale=None, multi_crop=None, crop_per_case=None,
                  normalize=None, shuffle=None, dir=None, unknown_dir=None, original_dir=None
-                 ,idx_filepath=None, mode=None):
+                 ,idx_filepath=None, mode=None, idx=True):
 
         """
         Args:
@@ -590,7 +592,7 @@ class lymphoma2ZIDX(lymphomaBase):
                                         , scale=self.scale, multi_crop=self.multi_crop, crop_per_case=self.crop_per_case
                                         , normalize=self.normalize, shuffle=self.shuffle, dir=dir,
                                         lymphoma_num_classes=2, unknown_dir=unknown_dir, original_dir=original_dir
-                                            ,idx_filepath=idx_filepath, mode=mode)
+                                            ,idx_filepath=idx_filepath, mode=mode, idx=True)
 
 
 if __name__ == '__main__':
