@@ -267,7 +267,7 @@ def read_write_idx_lymphoma(filenames, train_or_test='train', image_size=448, sc
                 cropsize = (
                 np.max(np.array(img.shape)), np.max(np.array(img.shape)[np.array(img.shape) < np.max(np.array(img.shape))]),
                 3)
-                print(" >>>>>>> &&&&& : ",image_size)
+                
                 if image_size is None:
                     print(" >>>>> No scaling will be performed")
                     #image_size = cropsize[1]#img.shape[0]
@@ -354,7 +354,7 @@ def read_write_idx_lymphoma(filenames, train_or_test='train', image_size=448, sc
                     ret.append([img_crop.astype("uint8"), label[k]])
                     # img = copy.deepcopy(img_og)
 
-        print(">>>> Total crops observed: ", total_crops)
+    print(">>>> Total crops observed: ", total_crops)
     return (ret, class_0, class_1, unique_samples)
 
 
@@ -440,7 +440,7 @@ class lymphomaBase( RNGDataFlow ):
         self.scale_size = scale_size
         
         print(">> reading in files from: ", original_dir)
-        if idx_filepath is None or (idx is None and mode is None):
+        if idx_filepath is None and (idx is None and mode is None):
             data = read_lymphoma(self.fs, train_or_test = self.train_or_test
                                  , image_size = self.image_size, scale_size = self.scale_size
                                  , scale = self.scale, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case
