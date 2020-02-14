@@ -347,8 +347,8 @@ class Model(ModelDesc):
       momentum = tf.cond( tf.equal(tf.constant(self.train_or_test), tf.constant(False)), lambda: tf.constant(0.99), lambda: momentum)
       return tf.train.MomentumOptimizer(lr, momentum, use_nesterov=True)#return tf.train.AdamOptimizer(lr, beta1=0.9, beta2=0.999,epsilon=1e-08)
    
-def optimizer(self):
-   return self._get_optimizer()
+   def optimizer(self):
+      return self._get_optimizer()
 
 def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None, scale = None, multi_crop = None, crop_per_case = None, normalize = None, unknown_dir = None, original_dir=None):
    isTrain = train_or_test == 'train'
