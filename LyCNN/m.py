@@ -15,6 +15,11 @@ import io
 
 # Personal Data Flow
 sys.path.append(os.getcwd())
+
+#import tensorflow as tf                                                                                                            
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+
 import LyCNN.datapack as datapack
 
 from tensorpack import *
@@ -33,8 +38,6 @@ import copy
 from PIL import Image
 
 import numpy as np
-
-import tensorflow as tf
 
 """ slurm gpu test 
 """

@@ -20,13 +20,17 @@ import pickle as pickle
 import random as rnd
 from LyCNN.datapack import quality_random_crop
 
+#import tensorflow as tf                                                                      
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+
 from tensorpack import *
 from tensorpack.tfutils.symbolic_functions import *
 from tensorpack.tfutils.summary import *
 from tensorpack.utils.utils import get_rng
 from tensorpack.dataflow.base import RNGDataFlow
 import numpy as np
-import tensorflow as tf
+
 from PIL import Image
 import cv2
 import copy
