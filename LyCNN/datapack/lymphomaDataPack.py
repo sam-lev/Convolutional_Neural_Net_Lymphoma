@@ -22,7 +22,7 @@ from LyCNN.datapack import quality_random_crop
 
 #import tensorflow as tf                                                                      
 import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
+#tf.disable_v2_behavior()
 
 from tensorpack import *
 from tensorpack.tfutils.symbolic_functions import *
