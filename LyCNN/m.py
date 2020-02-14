@@ -125,7 +125,7 @@ class Model(ModelDesc):
       ]
    # non-depricated
    def inputs(self):
-      return [tf.TensorSpec((None, 224, 224, 3), tf.uint8, 'input'),tf.TensorSpec((None,), tf.int32, 'label')]
+      return [tf.TensorSpec((None, self.image_size, self.image_size, 3), tf.float32, 'input'),tf.TensorSpec((None,), tf.int32, 'label')]
 
    def _build_graph(self, input_vars):
       image, label = input_vars
@@ -347,10 +347,8 @@ class Model(ModelDesc):
       momentum = tf.cond( tf.equal(tf.constant(self.train_or_test), tf.constant(False)), lambda: tf.constant(0.99), lambda: momentum)
       return tf.train.MomentumOptimizer(lr, momentum, use_nesterov=True)#return tf.train.AdamOptimizer(lr, beta1=0.9, beta2=0.999,epsilon=1e-08)
    
-   non_depricated="""def optimizer(self):
-   lr = tf.get_variable('learning_rate', initializer=0.001, trainable=False)
-   tf.summary.scalar('learning_rate', lr)
-   return tf.train.AdamOptimizer(lr, beta1=0.88, beta2=0.999,epsilon=1e-08)"""
+def optimizer(self):
+   return self._get_optimizer()
 
 def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None, scale = None, multi_crop = None, crop_per_case = None, normalize = None, unknown_dir = None, original_dir=None):
    isTrain = train_or_test == 'train'
