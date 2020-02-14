@@ -218,9 +218,9 @@ class Model(ModelDesc):
          return logits
       
       def prediction_incorrect(logits, label, topk=1, name='incorrect_vector'):
-         with tf.name_scope('prediction_incorrect'):
-            x = tf.logical_not(tf.nn.in_top_k(logits, label, topk))
-            return tf.cast(x, tf.float32, name=name)
+         #with tf.name_scope('prediction_incorrect'):
+         x = tf.logical_not(tf.nn.in_top_k(logits, label, topk))
+         return tf.cast(x, tf.float32, name=name)
       
       logits = dense_net("dense_net") #map probabilities to real domain
       
