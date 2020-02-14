@@ -203,7 +203,7 @@ class HematoEAug(imgaug.ImageAugmentor):
         else:
             return img, (self.low, self.high, self.seed, self.copy, self.with_prob)
 
-class normalize_staining(imgaug.transform.ImageTransform):
+class normalize_staining(imgaug.Transform):
     def __init__(self, copy = True):
         super(normalize_staining, self).__init__()
         self.copy = copy
@@ -354,7 +354,7 @@ class normalize_staining(imgaug.transform.ImageTransform):
     def apply_coords(self, coords):
         return coords
 
-class hematoxylin_eosin_aug(imgaug.transform.ImageTransform):
+class hematoxylin_eosin_aug(imgaug.Transform):
     def __init__(self, low=0.7, high=1.3, seed=None, copy=True):
         super(hematoxylin_eosin_aug, self).__init__()
         self.copy = copy
@@ -404,7 +404,7 @@ class hematoxylin_eosin_aug(imgaug.transform.ImageTransform):
     def apply_coords(self, coords):
         return coords
 
-class zoom_transform(imgaug.transform.ImageTransform):
+class zoom_transform(imgaug.Transform):
     def __init__(self, zoom, seed = None, copy = True):
         super(zoom_transform, self).__init__()
         self.zoom = zoom
