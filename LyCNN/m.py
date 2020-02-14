@@ -27,6 +27,7 @@ from tensorpack.models import BatchNorm
 from tensorpack.tfutils.symbolic_functions import *
 from tensorpack.tfutils.summary import *
 from tensorpack.tfutils.tower import get_current_tower_context
+from tensorpack.train import launch_train_with_config
 #from tensorpack.tfutils.symbolic_functions import prediction_incorrect
 
 #from tensorpack.dataflow import LocallyShuffleData

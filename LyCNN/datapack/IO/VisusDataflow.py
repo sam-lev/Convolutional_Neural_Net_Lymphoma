@@ -136,7 +136,7 @@ class ShowData:
 		dataset.executeQuery(access,query)
 		# transform the result of the query to a numpy array
 		data = ov.Array.toNumPy(query.buffer, bSqueeze=True, bShareMem=False)
-		print("read data shape: ", data.shape)
+		#print("read data shape: ", data.shape)
 		if len(data.shape) > 3:
 			squeeze = np.zeros((data.shape[1], data.shape[2], data.shape[3]))
 			squeeze_0 = data[0, :, :, :] #np.squeeze(data[0, :, :, :], axis=0)
@@ -198,7 +198,7 @@ class ReadData:
 			dataset.executeQuery(access,query)
 			# transform the result of the query to a numpy array
 			data = ov.Array.toNumPy(query.buffer, bSqueeze=True, bShareMem=False)
-			print("read data shape: ", data.shape)
+			#print("read data shape: ", data.shape)
 			if len(data.shape) > 3:
 				squeeze = np.zeros((data.shape[1], data.shape[2], data.shape[3]))
 				squeeze_0 = data[0, :, :, :] #np.squeeze(data[0, :, :, :], axis=0)
