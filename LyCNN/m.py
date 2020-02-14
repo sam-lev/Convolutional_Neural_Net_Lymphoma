@@ -118,15 +118,15 @@ class Model(ModelDesc):
       self.kernel_size = kernel_size 
       
       self.weight_decay_rate = 1e-4
-      
+   # depricated
    def _get_inputs(self):
       return [InputDesc(tf.float32, [None, self.image_size, self.image_size, 3], 'input'),
               InputDesc(tf.int32, [None], 'label') 
       ]
-   
-   nondep = """def inputs(self):
-   return [tf.TensorSpec((None, 224, 224, 3), tf.uint8, 'input'),tf.TensorSpec((None,), tf.int32, 'label')]"""
-   
+   # non-depricated
+   def inputs(self):
+      return [tf.TensorSpec((None, 224, 224, 3), tf.uint8, 'input'),tf.TensorSpec((None,), tf.int32, 'label')]
+
    def _build_graph(self, input_vars):
       image, label = input_vars
       image = tf.image.convert_image_dtype(image, dtype = tf.float32)
@@ -217,10 +217,10 @@ class Model(ModelDesc):
          
          return logits
       
-      non_deptrincated="""def prediction_incorrect(logits, label, topk=1, name='incorrect_vector'):
-      with tf.name_scope('prediction_incorrect'):
-      x = tf.logical_not(tf.nn.in_top_k(logits, label, topk))
-      return tf.cast(x, tf.float32, name=name)"""
+      def prediction_incorrect(logits, label, topk=1, name='incorrect_vector'):
+         with tf.name_scope('prediction_incorrect'):
+            x = tf.logical_not(tf.nn.in_top_k(logits, label, topk))
+            return tf.cast(x, tf.float32, name=name)
       
       logits = dense_net("dense_net") #map probabilities to real domain
       
@@ -245,12 +245,14 @@ class Model(ModelDesc):
       add_moving_summary(cost, wd_cost)
       
       add_param_summary(('.*/W', ['histogram']))   # monitor W
-      
+
       self.cost = tf.add_n([cost, wd_cost], name='cost')
+      return self.cost
    
-   
-   non_depricated = """def build_graph(self, image, label):
-   image = image
+
+   def build_graph(self, image, label):
+      return self._build_graph((image,label))
+   nondepreicated_reference = """image = image
    label = label
    #image = image / 128.0 - 1
    def conv(name, l, channel, stride):
