@@ -17,7 +17,7 @@ import io
 sys.path.append(os.getcwd())
 
 #import tensorflow as tf                                                                                                            
-import tensorflow.compat.v1 as tf
+import tensorflow as tf #.compat.v1 as tf
 #tf.disable_v2_behavior()
 #tf.disable_eager_execution()
 
