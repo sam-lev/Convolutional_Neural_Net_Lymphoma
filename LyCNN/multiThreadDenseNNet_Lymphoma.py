@@ -26,6 +26,7 @@ import LyCNN.datapack as datapack
 from tensorpack import *
 from tensorpack.models import BatchNorm
 from tensorpack.tfutils.symbolic_functions import *
+from tensorpack.utils import logger
 from tensorpack.tfutils.summary import *
 from tensorpack.tfutils.tower import get_current_tower_context
 from tensorpack.train import launch_train_with_config

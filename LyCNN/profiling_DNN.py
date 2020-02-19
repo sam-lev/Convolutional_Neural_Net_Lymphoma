@@ -21,11 +21,12 @@ import tensorflow as tf #.compat.v1 as tf
 #tf.disable_v2_behavior()
 #tf.disable_eager_execution()
 
-import LyCNN.datapack as datapack
+import LyCNN.datapack.profilingDataflow as datapack
 
-from tensorpack import *
+from tensorpack import * 
 from tensorpack.models import BatchNorm
 from tensorpack.tfutils.symbolic_functions import *
+from tensorpack.utils import logger
 from tensorpack.tfutils.summary import *
 from tensorpack.tfutils.tower import get_current_tower_context
 from tensorpack.train import launch_train_with_config
