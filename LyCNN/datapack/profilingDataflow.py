@@ -6,6 +6,7 @@
 #SBATCH -e slurm-%j.err-%N # name of the stderr, using the job number (%j) and the first node (%N)
 #SBATCH --gres=gpu:5
 
+import os
 import argparse
 from six.moves import range
 #from scipy.misc import imsave
@@ -388,7 +389,7 @@ class lymphomaBase( RNGDataFlow ):
                  , scale = 2, multi_crop=None, crop_per_case = None, normalize = 0
                  , shuffle=None, dir=None, lymphoma_num_classes=2,unknown_dir = None
                  , original_dir=None, write_crop=True, idx_filepath=None, mode=None
-                 , idx=False):
+                 , idx=False, resolution=None):
 
         assert train_or_test in ['train', 'test', 'val', '']
         assert lymphoma_num_classes == 2 or lymphoma_num_classes == 10
@@ -548,7 +549,7 @@ class lymphoma2ZIDX(lymphomaBase):
 
     def __init__(self, train_or_test, image_size=None, scale_size=None, scale=None, multi_crop=None, crop_per_case=None,
                  normalize=None, shuffle=None, dir=None, unknown_dir=None, original_dir=None
-                 ,idx_filepath=None, mode=None, idx=True):
+                 ,idx_filepath=None, mode=None, idx=True, resolution=None):
 
         """
         Args:
@@ -583,7 +584,7 @@ class lymphoma2ZIDX(lymphomaBase):
                                         , scale=self.scale, multi_crop=self.multi_crop, crop_per_case=self.crop_per_case
                                         , normalize=self.normalize, shuffle=self.shuffle, dir=dir,
                                         lymphoma_num_classes=2, unknown_dir=unknown_dir, original_dir=original_dir
-                                            ,idx_filepath=idx_filepath, mode=mode, idx=True)
+                                            ,idx_filepath=idx_filepath, mode=mode, idx=True, resolution=None)
 
 
 if __name__ == '__main__':

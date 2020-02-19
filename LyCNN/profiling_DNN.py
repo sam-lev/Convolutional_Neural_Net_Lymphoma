@@ -23,7 +23,7 @@ import tensorflow as tf #.compat.v1 as tf
 
 import LyCNN.datapack.profilingDataflow as datapack
 
-from tensorpack import * 
+from tensorpack import *
 from tensorpack.models import BatchNorm
 from tensorpack.tfutils.symbolic_functions import *
 from tensorpack.utils import logger
