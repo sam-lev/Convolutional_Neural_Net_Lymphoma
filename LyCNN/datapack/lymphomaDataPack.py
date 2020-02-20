@@ -8,35 +8,25 @@
 
 import argparse
 import os
-
-import six 
 from six.moves import range
-from abc import abstractmethod, ABCMeta
-import threading
 
 #from scipy.misc import imsave
 import pickle as pickle
-
-import random as rnd
-from LyCNN.datapack import quality_random_crop
-
 #import tensorflow as tf
-# #import tensorflow as tf #.compat.v1 as tf
+#import tensorflow as tf #.compat.v1 as tf
 #tf.disable_v2_behavior()
-
 from tensorpack import *
 from tensorpack.tfutils.symbolic_functions import *
 from tensorpack.tfutils.summary import *
 from tensorpack.utils.utils import get_rng
 from tensorpack.dataflow.base import RNGDataFlow
 import numpy as np
-
 from PIL import Image
 import cv2
 import copy
+from memory_profiler import profile
 
 from LyCNN.datapack.IO import VisusDataflow
-
 from LyCNN.datapack.medical_aug import normalize_staining, hematoxylin_eosin_aug
 
 
@@ -192,10 +182,13 @@ def read_lymphoma(filenames,  train_or_test = 'train', image_size = 448, scale_s
     return (ret, class_0, class_1, unique_samples)
 
 # read data and write to idx file with z space
-# filling order for controllable resolution
+# filling order for controlable resolution
+memory_log = "no_name.log"
+memory_profile_log=open(memory_log,'w+')
+@profile(stream=memory_profile_log)
 def read_write_idx_lymphoma(filenames, train_or_test='train', image_size=448, scale_size=224, scale=2, multi_crop=0
                             ,crop_per_case=None, normalize=None, original_dir=None
-                            , write_crop=True, idx_filepath='', mode=None ):
+                            , write_crop=True, idx_filepath='', mode=None, resolution=None):
     num_show = 5
     ret = []
     class_0 = 0
@@ -217,7 +210,7 @@ def read_write_idx_lymphoma(filenames, train_or_test='train', image_size=448, sc
             fo.close()
 
         if mode == 'r':
-            idx_sample = VisusDataflow.ReadData(data=fname, load=True)
+            idx_sample = VisusDataflow.ReadData(data=fname, load=True, resolution=resolution)
             idx_samples.append(idx_sample.data)
             idx_labels.append(int(str(1) in fname.split('~')[-1]))
             #continue collecting from folder
@@ -404,7 +397,7 @@ class lymphomaBase( RNGDataFlow ):
                  , scale = 2, multi_crop=None, crop_per_case = None, normalize = 0
                  , shuffle=None, dir=None, lymphoma_num_classes=2,unknown_dir = None
                  , original_dir=None, write_crop=True, idx_filepath=None, mode=None
-                 , idx=False):
+                 , idx=False, resolution=None):
 
         assert train_or_test in ['train', 'test', 'val', '']
         assert lymphoma_num_classes == 2 or lymphoma_num_classes == 10
@@ -455,7 +448,7 @@ class lymphomaBase( RNGDataFlow ):
                                  , image_size = self.image_size, scale_size = self.scale_size
                                  , scale = self.scale, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case
                                  , normalize = self.normalize, original_dir=original_dir
-                                 ,write_crop=write_crop, idx_filepath=idx_filepath, mode=mode) #different classes changes here ect..
+                                 ,write_crop=write_crop, idx_filepath=idx_filepath, mode=mode, resolution=resolution) #different classes changes here ect..
         self.data = data[0]
         self.class_0 = data[1]
         self.class_1 = data[2]
@@ -473,6 +466,7 @@ class lymphomaBase( RNGDataFlow ):
         return len(self.data)
     
     # Required get_data for DataFlow
+    @profile(stream=memory_profile_log)
     def get_data(self):
         image_data = np.arange(len(self.data))
         if self.shuffle:
@@ -482,7 +476,8 @@ class lymphomaBase( RNGDataFlow ):
 
     def __len__(self):
         return len(self.data)
-    
+
+    @profile(stream=memory_profile_log)
     def __iter__(self):
         idxs = np.arange(len(self.data))
         if self.shuffle:
@@ -564,7 +559,7 @@ class lymphoma2ZIDX(lymphomaBase):
 
     def __init__(self, train_or_test, image_size=None, scale_size=None, scale=None, multi_crop=None, crop_per_case=None,
                  normalize=None, shuffle=None, dir=None, unknown_dir=None, original_dir=None
-                 ,idx_filepath=None, mode=None, idx=True):
+                 ,idx_filepath=None, mode=None, idx=True, resolution=None, memory_profile=None):
 
         """
         Args:
@@ -574,6 +569,8 @@ class lymphoma2ZIDX(lymphomaBase):
         if mode is None:
             print("no read or write mode provided. Assuming read ('r')")
             mode = 'r'
+        if memory_profile is not None:
+            memory_log = memory_profile
 
         if shuffle == None and train_or_test == 'train':
             shuffle = True
@@ -599,7 +596,7 @@ class lymphoma2ZIDX(lymphomaBase):
                                         , scale=self.scale, multi_crop=self.multi_crop, crop_per_case=self.crop_per_case
                                         , normalize=self.normalize, shuffle=self.shuffle, dir=dir,
                                         lymphoma_num_classes=2, unknown_dir=unknown_dir, original_dir=original_dir
-                                            ,idx_filepath=idx_filepath, mode=mode, idx=True)
+                                            ,idx_filepath=idx_filepath, mode=mode, idx=True, resolution=resolution)
 
 
 if __name__ == '__main__':

@@ -361,11 +361,17 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
                            , scale = scale, multi_crop=multi_crop, crop_per_case = crop_per_case
                            , normalize = normalize, shuffle = shuffle, dir = '../data'
                            , unknown_dir = unknown_dir,original_dir=original_dir)"""
+
+   if args.model_name is None:
+      args.model_name = "no_name"
+   mem_log = 'train_log/'+args.model_name+'/memory_log.log'
+   if not os.path.exists(mem_log):
+      os.mkdir(mem_log)
    ds = datapack.lymphoma2ZIDX(train_or_test, image_size=image_size, scale_size=scale_size
                            , scale=scale, multi_crop=multi_crop, crop_per_case=crop_per_case
                            , normalize=normalize, shuffle=shuffle, dir='./data'
                            , unknown_dir=unknown_dir, original_dir=original_dir
-                               , idx=True, mode='r')
+                               , idx=True, mode='r', memory_profile=mem_log)
    args.unique_samples = ds.unique_samples
    
    if train_or_test == 'train':
