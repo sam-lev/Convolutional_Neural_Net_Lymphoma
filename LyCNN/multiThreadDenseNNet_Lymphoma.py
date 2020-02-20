@@ -364,7 +364,7 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
 
    if args.model_name is None:
       args.model_name = "no_name"
-   mem_log = 'train_log/'+args.model_name+'/memory_log.log'
+   mem_log = 'train_log/'+args.model_name+'/memory_log.txt'
    if not os.path.exists(mem_log):
       os.mkdir(mem_log)
    ds = datapack.lymphoma2ZIDX(train_or_test, image_size=image_size, scale_size=scale_size

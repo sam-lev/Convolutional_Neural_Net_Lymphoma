@@ -397,7 +397,7 @@ class lymphomaBase( RNGDataFlow ):
                  , scale = 2, multi_crop=None, crop_per_case = None, normalize = 0
                  , shuffle=None, dir=None, lymphoma_num_classes=2,unknown_dir = None
                  , original_dir=None, write_crop=True, idx_filepath=None, mode=None
-                 , idx=False, resolution=None):
+                 , idx=False, resolution=None, memory_profile = None):
 
         assert train_or_test in ['train', 'test', 'val', '']
         assert lymphoma_num_classes == 2 or lymphoma_num_classes == 10
@@ -461,11 +461,13 @@ class lymphomaBase( RNGDataFlow ):
         print("")
         self.dir = dir
         self.shuffle = shuffle
+        #self.memory_log = self.memory_profile
         
     def size(self):
         return len(self.data)
     
     # Required get_data for DataFlow
+    memory_profile_log = open(memory_log, 'w+')
     @profile(stream=memory_profile_log)
     def get_data(self):
         image_data = np.arange(len(self.data))
@@ -477,6 +479,7 @@ class lymphomaBase( RNGDataFlow ):
     def __len__(self):
         return len(self.data)
 
+    memory_profile_log = open(memory_log, 'w+')
     @profile(stream=memory_profile_log)
     def __iter__(self):
         idxs = np.arange(len(self.data))
@@ -596,7 +599,7 @@ class lymphoma2ZIDX(lymphomaBase):
                                         , scale=self.scale, multi_crop=self.multi_crop, crop_per_case=self.crop_per_case
                                         , normalize=self.normalize, shuffle=self.shuffle, dir=dir,
                                         lymphoma_num_classes=2, unknown_dir=unknown_dir, original_dir=original_dir
-                                            ,idx_filepath=idx_filepath, mode=mode, idx=True, resolution=resolution)
+                                            ,idx_filepath=idx_filepath, mode=mode, idx=True, resolution=resolution, memory_profile = memory_profile)
 
 
 if __name__ == '__main__':
