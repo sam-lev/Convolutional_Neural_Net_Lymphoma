@@ -211,6 +211,7 @@ class ReadData:
 				data = squeeze_0
 			ov.DbModule.detach()
 			self.data = data
+			print(" shape data: ", data.shape)
 			return data
 			#if data.shape[0]<=3:
 			#	data = np.transpose(data,(1,2,0))
