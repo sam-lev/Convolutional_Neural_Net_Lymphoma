@@ -34,17 +34,16 @@ class WriteZOrder:
 		os.environ["VISUS_DISABLE_WRITE_LOCK"]="1"
 
 		# numpy display is Z,Y,X
-		print("image shape ", self.image.shape)
+		#print("image shape ", self.image.shape)
 
 		height, width, depth = self.image.shape
 
 		#img =  np.transpose(self.image, [2,0,1])
 
-		#
-		print(self.image.shape)
+		#print(self.image.shape)
 
 		idx_name = idx_filename
-		print("image", idx_name, "has dimensions", width, height, depth)
+		#print("image", idx_name, "has dimensions", width, height, depth)
 
 		# to disable offset just set this to 0
 		offset_x = 0
@@ -53,7 +52,7 @@ class WriteZOrder:
 		typestr = self.image.__array_interface__["typestr"]
 		dtype = ov.DType(typestr[1] == "u", typestr[1] == "f", int(typestr[2]) * 8 )
 		dtype = ov.DType(3, dtype)
-		print("dtype written: ",dtype.toString())
+		#print("dtype written: ",dtype.toString())
 
 		dims = ov.PointNi(int(width + offset_x * depth), int(height),  int(depth))
 
@@ -62,7 +61,7 @@ class WriteZOrder:
 		idx_file.fields.push_back(ov.Field('channel0', dtype))
 		idx_file.save(idx_name)
 
-		print("Created IDX file")
+		#print("Created IDX file")
 
 		dataset = ov.LoadDataset(idx_name)
 		access = dataset.createAccess()
@@ -100,7 +99,7 @@ class WriteZOrder:
 
 
 		ov.DbModule.detach()
-		print("Done with conversion")
+		#print("Done with conversion")
 
 # enable/disable these two lines after debugging
 # ArrayUtils.saveImageUINT8("tmp/slice%d.orig.png" % (Z,),Array.fromNumPy(data))
@@ -186,7 +185,11 @@ class ReadData:
 			if resolution is None:
 				resolution = dataset.getMaxResolution()
 			else:
-				resolution = dataset.getMaxResolution()*resolution
+				resolution = int(dataset.getMaxResolution()*resolution)
+
+			print(" >>>>> ")
+			print("  Using Resolution: ", resolution, " max resolution = ", dataset.getMaxResolution())
+			print(" >>>>> ")
 			# define a box query to fetch data from a certain dataset, field and timestep
 			query=ov.BoxQuery(dataset, dataset.getDefaultField(), dataset.getDefaultTime(), ord('r'))
 			logic_box = dataset.getLogicBox()
