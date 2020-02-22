@@ -371,7 +371,7 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
                            , scale=scale, multi_crop=multi_crop, crop_per_case=crop_per_case
                            , normalize=normalize, shuffle=shuffle, dir='./data'
                            , unknown_dir=unknown_dir, original_dir=original_dir
-                               , idx=True, mode='r', memory_profile=mem_log)
+                           ,resolution=args.frac_res, idx=True, mode='r', memory_profile=mem_log)
    args.unique_samples = ds.unique_samples
    
    if train_or_test == 'train':
@@ -646,6 +646,8 @@ if __name__ == '__main__':
    parser.add_argument('--scale',type=int, default=2,help="factor of 224 to crop and scale down scale*(224,224)->(224,224)")
    parser.add_argument('--crop_per_case',type=int, default=40,help="number, more than 1, of images from each case to multi_crop. Average of crop classifications used in application")
    parser.add_argument('--unique_samples',type=int, help="Number of unique samples (excluding crops) used for averaging testing results")
+   parser.add_argument('--frac_res', type=float, default=1.0, help="fraction to reduce resolution of data used for training")
+
    args = parser.parse_args()
    args.scale_size = args.image_size
    

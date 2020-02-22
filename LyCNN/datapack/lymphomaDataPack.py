@@ -24,7 +24,7 @@ import numpy as np
 from PIL import Image
 import cv2
 import copy
-from memory_profiler import profile
+#from memory_profiler import profile
 
 from LyCNN.datapack.IO import VisusDataflow
 from LyCNN.datapack.medical_aug import normalize_staining, hematoxylin_eosin_aug
@@ -183,9 +183,9 @@ def read_lymphoma(filenames,  train_or_test = 'train', image_size = 448, scale_s
 
 # read data and write to idx file with z space
 # filling order for controlable resolution
-memory_log = "no_name.log"
+"""memory_log = "no_name.log"
 memory_profile_log=open(memory_log,'w+')
-@profile(stream=memory_profile_log)
+@profile(stream=memory_profile_log)"""
 def read_write_idx_lymphoma(filenames, train_or_test='train', image_size=448, scale_size=224, scale=2, multi_crop=0
                             ,crop_per_case=None, normalize=None, original_dir=None
                             , write_crop=True, idx_filepath='', mode=None, resolution=None):
@@ -467,8 +467,8 @@ class lymphomaBase( RNGDataFlow ):
         return len(self.data)
     
     # Required get_data for DataFlow
-    memory_profile_log = open(memory_log, 'w+')
-    @profile(stream=memory_profile_log)
+    """memory_profile_log = open(memory_log, 'w+')
+    @profile(stream=memory_profile_log)"""
     def get_data(self):
         image_data = np.arange(len(self.data))
         if self.shuffle:
@@ -479,8 +479,8 @@ class lymphomaBase( RNGDataFlow ):
     def __len__(self):
         return len(self.data)
 
-    memory_profile_log = open(memory_log, 'w+')
-    @profile(stream=memory_profile_log)
+    """memory_profile_log = open(memory_log, 'w+')
+    @profile(stream=memory_profile_log)"""
     def __iter__(self):
         idxs = np.arange(len(self.data))
         if self.shuffle:
