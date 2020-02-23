@@ -303,8 +303,8 @@ def read_write_idx_lymphoma(filenames, train_or_test='train', image_size=448, sc
                 for tile in range(multi_crop_):
                     if multi_crop_ != 1:
                         total_crops += 1
-                    full_w = img_crop.shape[0]
-                    full_h = img_crop.shape[1]
+                    full_w = img_og.shape[0]
+                    full_h = img_og.shape[1]
                     if multi_crop_ > 4:
                         continue
                     start_w = [full_w//10, full_w//5, full_w//3, full_w//2][tile] if multi_crop_ <= 4 else [100, 200, 300, 400, 500, 600][tile]
