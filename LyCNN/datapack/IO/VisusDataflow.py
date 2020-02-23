@@ -128,7 +128,11 @@ class ShowData:
 		# set the bounding box for our query
 		query.logic_box=logic_box
 		# set the resolution
-		resolution = resolution if resolution is not None else dataset.getMaxResolution()
+		if resolution is None:
+			resolution = dataset.getMaxResolution()
+		else:
+			resolution = int(dataset.getMaxResolution() * resolution)
+
 		query.end_resolutions.push_back(resolution)
 		# prepare and execute the query
 		dataset.beginQuery(query)

@@ -303,15 +303,25 @@ def read_write_idx_lymphoma(filenames, train_or_test='train', image_size=448, sc
                 for tile in range(multi_crop_):
                     if multi_crop_ != 1:
                         total_crops += 1
-                    start_w = [100, 300, 500, 700][tile] if multi_crop_ <= 4 else [100, 200, 300, 400, 500, 600][tile]
-                    start_h = [400, 400, 400, 400][tile] if multi_crop_ <= 4 else [400, 400, 400, 400, 400, 400][tile]
+                    full_w = img_crop.shape[0]
+                    full_h = img_crop.shape[1]
+                    if multi_crop_ > 4:
+                        continue
+                    start_w = [full_w//10, full_w//5, full_w//3, full_w//2][tile] if multi_crop_ <= 4 else [100, 200, 300, 400, 500, 600][tile]
+                    start_h = [full_h//10, full_h//5, full_h//3, full_h//2][tile] if multi_crop_ <= 4 else [400, 400, 400, 400, 400, 400][tile]
 
                     copy_func = copy.deepcopy if multi_crop_ != 1 else lambda x: x
                     img_crop = copy.deepcopy(img_og)
 
                     if image_size is not None:
-                        img_crop = img_crop[start_w:(start_w + 2 * image_size), start_h:(start_h + 2 * image_size), :]
+                        if (start_w + 2 * image_size < full_w) and (start_h + 2 * image_size < full_h):
+                            img_crop = img_crop[start_w:(start_w + 2 * image_size), start_h:(start_h + 2 * image_size), :]
+                        else:
+                            img_crop = img_crop[0:image_size, 0:image_size, :]
 
+                    if image_size is not None and (img_crop.shape[0] < image_size or img_crop.shape[1] < image_size):
+                        print(" >>>>>>>>>>>>>>>> WARNING: excluding sample, too small")
+                        continue
                     # write crop in IDX file format in
                     # Z space filling order for parameter based
                     # resolutuion on read
@@ -329,9 +339,10 @@ def read_write_idx_lymphoma(filenames, train_or_test='train', image_size=448, sc
                         #img_crop.show()
                         #import sys
                         #sys.exit(0)
-                        img_crop = img_crop.resize((image_size, image_size), Image.ANTIALIAS)
-                        img_crop = np.array(img_crop)
-                        img_crop = img_crop.reshape((image_size, image_size, 3))  # .transpose(0,3,1,2)
+                        if img_crop.shape[0] != image_size:
+                            img_crop = img_crop.resize((image_size, image_size), Image.ANTIALIAS)
+                            img_crop = np.array(img_crop)
+                            img_crop = img_crop.reshape((image_size, image_size, 3))  # .transpose(0,3,1,2)
 
                     # to place as nd array for tensorflow and augmentors
                     if label[k] == 0:
