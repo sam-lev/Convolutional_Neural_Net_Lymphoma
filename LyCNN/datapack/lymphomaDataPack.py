@@ -335,11 +335,12 @@ def read_write_idx_lymphoma(filenames, train_or_test='train', image_size=448, sc
                         #im_crop = np.transpose(img_og, [1, 2, 0])
                     # img_stack = np.expand_dims( img_crop, axis=0)
                     if image_size is not None:
-                        img_crop = Image.fromarray(img_crop, 'RGB')
-                        #img_crop.show()
-                        #import sys
-                        #sys.exit(0)
+
                         if img_crop.shape[0] != image_size:
+                            img_crop = Image.fromarray(img_crop, 'RGB')
+                            # img_crop.show()
+                            # import sys
+                            # sys.exit(0)
                             img_crop = img_crop.resize((image_size, image_size), Image.ANTIALIAS)
                             img_crop = np.array(img_crop)
                             img_crop = img_crop.reshape((image_size, image_size, 3))  # .transpose(0,3,1,2)
