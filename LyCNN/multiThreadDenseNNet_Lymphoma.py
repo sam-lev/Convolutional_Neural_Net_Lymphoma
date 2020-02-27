@@ -482,7 +482,7 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
          print("    >>>>>>>>>> Creating multiprocess with ", mp.cpu_count(), " total processes.")
          ds = MultiProcessMapData(ds,
                                   map_func=aug_map_func,
-                                  nr_proc=mp.cpu_count()//4)
+                                  nr_proc=2)#mp.cpu_count()//4)
          ds = PrefetchDataZMQ(ds, nr_proc = 1)
          ds = BatchData(ds, batch_size, remainder=not isTrain)
       else:
