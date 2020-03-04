@@ -191,9 +191,9 @@ class ReadData:
 			else:
 				resolution = int(dataset.getMaxResolution()*resolution)
 
-			print(" >>>>> ")
-			print("  Using Resolution: ", resolution, " max resolution = ", dataset.getMaxResolution())
-			print(" >>>>> ")
+			#print(" >>>>> ")
+			#print("  Using Resolution: ", resolution, " max resolution = ", dataset.getMaxResolution())
+			#print(" >>>>> ")
 			# define a box query to fetch data from a certain dataset, field and timestep
 			query=ov.BoxQuery(dataset, dataset.getDefaultField(), dataset.getDefaultTime(), ord('r'))
 			logic_box = dataset.getLogicBox()
@@ -215,7 +215,7 @@ class ReadData:
 				data = squeeze_0
 			ov.DbModule.detach()
 			self.data = data
-			print(" shape data: ", data.shape)
+			#print(" shape data: ", data.shape)
 			return data
 			#if data.shape[0]<=3:
 			#	data = np.transpose(data,(1,2,0))
