@@ -32,7 +32,7 @@ kernels=12  #kernels
 expansion=12  #expansion
 depth=24  #depth
 augrandhe=0   #aug ramd he
-script='multiThreadDenseNNet_Lymphoma.py'
+script='./LyCNN/multiThreadDenseNNet_Lymphoma.py'
 echo 1: model "$model", 3: multi_crop "$multicrop", 5: crop_per_case "$croppercase", 5: kernels "$kernels", 6: expansion "$expansion", 7: depth "$depth", 8: aug_randhe "$augrandhe", 9:script "$script" #, 9:py "$script" , 10:server ${10} ,
 
 #medusa==1  fsm==0
