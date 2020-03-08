@@ -2,9 +2,11 @@
 #SBATCH --time=41:06:66 # walltime, abbreviated by -t                           
 #SBATCH --mem=110G                                                              
 #SBATCH --job-name="shmerp"                                                     
-#SBATCH -o model_shallow.out-%j # name of the stdout, using the job number (%j) and the first node (%N)    
-#SBATCH -e model_shallow.err-%j # name of the stderr, using the job number (%j) and the first node (%N) 
+#SBATCH -o mem_idx_80_classify.out-%j # name of the stdout, using the job number (%j) and the first node (%N)
+#SBATCH -e mem_idx_80_classify.err-%j # name of the stderr, using the job number (%j) and the first node (%N)
 #SBATCH --gres=gpu:1
+
+source ~/.bashrc
 
 model="$1"
 
@@ -12,90 +14,89 @@ model="$1"
 #
 #    sbatch (model) (multi_crop) (crop_per_case) (kernels) (expansion) (depth) (aug_norm) (script) (server) 
 #
-#    sbatch ./train_log/model 3 20 16 12 40 0 multiThreadNet.py 1 1
-
-
+#    sbatch ./train_log/model 4 20 16 12 40 0 multiThreadNet.py 1 1
 # note: multi_crop==0 for single crop (non-multiple).
+#multicrop=$3   #multicrop
+#croppercase=$4 #crop per case
+#kernels=$5     #kernels
+#expansion=$6   #expansion
+#depth=$7       #depth
+#augrandhe=$8   #aug ramd he
+#script=$9
 
-echo 1: model "$model", 2: multi_crop "$2", 3: crop_per_case "$3", 4: kernels "$4", 5: expansion "$5", 6: depth "$6", 7: aug_randhe "$7", 8:script "$8", 9:py "$9" , 10:server ${10} , 
-#source ~/.bashrc
+
+# presets for best model:
+multicrop=0   #multicrop
+croppercase=0   #crop per case
+kernels=12  #kernels
+expansion=12  #expansion
+depth=24  #depth
+augrandhe=0   #aug ramd he
+script='multiThreadDenseNNet_Lymphoma.py'
+echo 1: model "$model", 3: multi_crop "$multicrop", 5: crop_per_case "$croppercase", 5: kernels "$kernels", 6: expansion "$expansion", 7: depth "$depth", 8: aug_randhe "$augrandhe", 9:script "$script" #, 9:py "$script" , 10:server ${10} ,
 
 #medusa==1  fsm==0
-if [ $9 -eq 1 ]
+if [ $2 -eq 1 ]
 then
-    PY='/home/sci/samlev/anaconda3/envs/tf2/bin/python3.5'
+    conda activate slurmtftpidx
+    PY='python'
+    #/home/sci/samlev/anaconda3/envs/tf2/bin/python3.6'
 else
-    PY='python3.4'
+    conda activate fsm_tftpidx
+    PY='python'
 fi
+
 #medusa==1 fsm==0 hard assign gpu == 0
-if [ $9 -eq 1 ]
+if [ $2 -eq 1 ]
 then
-    GPU='--num_gpu' #/home/sci/samlev/anaconda3/envs/tf2/bin/python3.5'
+    GPU='--num_gpu' #/home/sci/samlev/anaconda3/envs/tf2/bin/python3.6'
     N=1
 else
     GPU='--gpu'
     N=1
 fi
 
-# if fsm change env 
-if [ ${10} -eq 0 ] 
-then
-    source ~/.bashfsm
-    __conda_setup="$('/home/sci/samlev/anaconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
-    if [ $? -eq 0 ]; then
-	eval "$__conda_setup"
-    else
-	if [ -f "/home/sci/samlev/anaconda3/etc/profile.d/conda.sh" ]; then
-            . "/home/sci/samlev/anaconda3/etc/profile.d/conda.sh"
-	else
-            export PATH="/home/sci/samlev/anaconda3/bin:$PATH"
-	fi
-    fi
-    unset __conda_setup
-    conda activate tf2
-fi
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir HQ_DLBCL --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir HQ_DLBCL --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir HQ_BL --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir HQ_BL --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir PCS-17-3002 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir PCS-17-3002 --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir HP-18-643 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir HP-18-643 --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir HP-16-1212_1 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir HP-16-1212_1 --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir HP-14-453 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir HP-14-453 --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir 5-HE --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir 4-HE --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir 7-HE --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir 6-HE --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir SP-12-18833 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir SP-12-18833 --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
-
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir SP-18-7695 --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir SP-18-7695 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir SP-18-15882 --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir SP-18-15882 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir SP-18-0022776 --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir SP-18-0022776 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir SP-18-26597 --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir SP-18-26597 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir SP-19-2811 --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir SP-19-2811 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir SP-19-5085 --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir SP-19-5085 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir SP-19-8085 --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir SP-19-8085 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-#$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir P --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+#$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir P --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-#$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir Q --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+#$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir Q --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-#$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir R --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+#$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir R --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-#$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir SP --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm $7
+#$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir SP --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm $augrandhe
 
-#$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir J1 --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+#$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir J1 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
 
-#$PY $8 --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name ep_134_unkown_A --load "$model" --unknown_dir J2 --depth $6 --class_weights 1,1 --crop_per_case $3 --multi_crop $2 --kernels $4 --expansion $5 --aug_norm 0 --aug_randhe $7
+#$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir J2 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe
