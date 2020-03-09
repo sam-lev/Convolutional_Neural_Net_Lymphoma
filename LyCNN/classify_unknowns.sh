@@ -27,7 +27,7 @@ model="$1"
 
 # presets for best model:
 multicrop=0   #multicrop
-croppercase=0   #crop per case
+croppercase=100000   #crop per case
 kernels=12  #kernels
 expansion=12  #expansion
 depth=24  #depth

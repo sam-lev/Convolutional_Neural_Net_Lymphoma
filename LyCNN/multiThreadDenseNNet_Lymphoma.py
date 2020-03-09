@@ -357,21 +357,24 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
    isTrain = train_or_test == 'train'
    isVal = train_or_test == 'val'
    #ds = FakeData([[args.batch_size*10, 224, 224, 3], [args.batch_size*10]], 1000, random=False, dtype='uint32')
-   """ds = datapack.lymphoma2(train_or_test, image_size = image_size, scale_size = scale_size
-                           , scale = scale, multi_crop=multi_crop, crop_per_case = crop_per_case
-                           , normalize = normalize, shuffle = shuffle, dir = '../data'
-                           , unknown_dir = unknown_dir,original_dir=original_dir)"""
+
 
    if args.model_name is None:
       args.model_name = "no_name"
    mem_log = 'train_log/'+args.model_name+'/memory_log.txt'
    if not os.path.exists(mem_log):
       os.mkdir(mem_log)
-   ds = datapack.lymphoma2ZIDX(train_or_test, image_size=image_size, scale_size=scale_size
-                           , scale=scale, multi_crop=multi_crop, crop_per_case=crop_per_case
-                           , normalize=normalize, shuffle=shuffle, dir='./data'
-                           , unknown_dir=unknown_dir, original_dir=original_dir
-                           ,resolution=args.frac_res, idx=True, mode='r', memory_profile=mem_log)
+   if not isTrain:
+      ds = datapack.lymphoma2(train_or_test, image_size=image_size, scale_size=scale_size
+                              , scale=scale, multi_crop=multi_crop, crop_per_case=crop_per_case
+                              , normalize=normalize, shuffle=shuffle, dir='../data'
+                              , unknown_dir=unknown_dir, original_dir=original_dir)
+   else:
+      ds = datapack.lymphoma2ZIDX(train_or_test, image_size=image_size, scale_size=scale_size
+                              , scale=scale, multi_crop=multi_crop, crop_per_case=crop_per_case
+                              , normalize=normalize, shuffle=shuffle, dir='./data'
+                              , unknown_dir=unknown_dir, original_dir=original_dir
+                              ,resolution=args.frac_res, idx=True, mode='r', memory_profile=mem_log)
    args.unique_samples = ds.unique_samples
    
    if train_or_test == 'train':
