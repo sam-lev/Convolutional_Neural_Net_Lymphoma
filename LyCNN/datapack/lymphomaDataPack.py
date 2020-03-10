@@ -197,6 +197,7 @@ def read_write_idx_lymphoma(filenames, train_or_test='train', image_size=448, sc
     unique_samples = 0
     idx_samples = []
     idx_labels = []
+    data=[]
     for fname in filenames:
         if mode == 'w':
             with open(fname, 'rb') as fo:
