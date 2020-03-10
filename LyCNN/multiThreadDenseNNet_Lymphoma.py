@@ -353,11 +353,17 @@ class Model(ModelDesc):
    def optimizer(self):
       return self._get_optimizer()
 
-def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None, scale = None, multi_crop = None, crop_per_case = None, normalize = None, unknown_dir = None, original_dir=None):
+def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
+             , scale = None, multi_crop = None, crop_per_case = None, normalize = None
+             , unknown_dir = None, original_dir=None):
    isTrain = train_or_test == 'train'
    isVal = train_or_test == 'val'
    #ds = FakeData([[args.batch_size*10, 224, 224, 3], [args.batch_size*10]], 1000, random=False, dtype='uint32')
 
+   if args.data_dir is None:
+      dir = '../data'
+   else:
+      dir = args.data_dir
 
    if args.model_name is None:
       args.model_name = "no_name"
@@ -367,7 +373,7 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
    if not isTrain:
       ds = datapack.lymphoma2(train_or_test, image_size=image_size, scale_size=scale_size
                               , scale=scale, multi_crop=multi_crop, crop_per_case=crop_per_case
-                              , normalize=normalize, shuffle=shuffle, dir='../data'
+                              , normalize=normalize, shuffle=shuffle, dir=dir
                               , unknown_dir=unknown_dir, original_dir=original_dir)
    else:
       ds = datapack.lymphoma2ZIDX(train_or_test, image_size=image_size, scale_size=scale_size
@@ -632,6 +638,7 @@ if __name__ == '__main__':
    parser.add_argument('--unknown_dir',type= str, default='../data/Unknowns/predictions/',help="unknown samples to classify")
    parser.add_argument('--save_sample',type= bool, default=False,help="boolean save originals")
    parser.add_argument('--original_dir',default=False,help="directory to save originals")
+   parser.add_argument('--data_dir', default=None, help="directory to read data from")
    parser.add_argument('--num_gpu',type= int,help="Number GPU to use if not specificaly assigned")
    parser.add_argument('--scale_lr',type= float,default=1.0,help="Scale learning rate factor (for distributed training)")
    parser.add_argument('--gpu_frac',type= float,default=0.96,help="Number GPU to use if not specificaly assigned")
