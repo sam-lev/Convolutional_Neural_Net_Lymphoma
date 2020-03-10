@@ -371,11 +371,10 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
    if not os.path.exists(mem_log):
       os.mkdir(mem_log)
    if not isTrain:
-      print("here >>>>>>>>>>>>>>>>>>")
       ds = datapack.lymphoma2(train_or_test, image_size=image_size, scale_size=scale_size
                               , scale=scale, multi_crop=multi_crop, crop_per_case=crop_per_case
                               , normalize=normalize, shuffle=shuffle, dir=dir
-                              , unknown_dir=unknown_dir, original_dir=original_dir)
+                              , unknown_dir=unknown_dir, original_dir=original_dir, idx=None)
    else:
       ds = datapack.lymphoma2ZIDX(train_or_test, image_size=image_size, scale_size=scale_size
                               , scale=scale, multi_crop=multi_crop, crop_per_case=crop_per_case
