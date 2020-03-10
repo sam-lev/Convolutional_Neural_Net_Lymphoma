@@ -399,6 +399,7 @@ def get_filenames(dir, train_or_test = '', unknown_dir = None, idx = False):
             file_count_unknown = len(files_unknown)
             filenames = [os.path.join(dir, 'Unknown',unknown_dir,f) for f in files_unknown]
     print(" >>>>>>>>>>>>>>>>>>>   total files: ", len(filenames))
+    print(filenames)
     return filenames
 
 class lymphomaBase( RNGDataFlow ):
