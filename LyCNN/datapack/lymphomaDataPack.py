@@ -560,7 +560,8 @@ class lymphoma2(lymphomaBase):
         super(lymphoma2, self).__init__(train_or_test, image_size = self.image_size, scale_size = self.scale_size
                                         , scale=self.scale, multi_crop=self.multi_crop, crop_per_case = self.crop_per_case
                                         , normalize = self.normalize, shuffle = self.shuffle, dir=dir, lymphoma_num_classes = 2
-                                        ,unknown_dir = unknown_dir, original_dir = original_dir, idx=False)
+                                        ,unknown_dir = unknown_dir, original_dir = original_dir
+                                        , idx=False,idx_filepath=None, mode=None)
 
 # data converter for dataflow into IDX format
 # written to disk in Z space filling order
