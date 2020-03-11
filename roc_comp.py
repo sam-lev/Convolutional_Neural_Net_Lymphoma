@@ -5,10 +5,16 @@ from sklearn import metrics
 import scikitplot as skplt
 from os import listdir
 from os.path import isfile, join
+import argparse
 
-base_path = "./data/Predictions/Graph_XIII1104-143215/bn059"
-bl_path = join(base_path,"BL")
-dl_path = join(base_path,"DLBCL")
+parser = argparse.ArgumentParser()
+parser.add_argument('--model',type= str, default='MODEL',help="Name of model (and folder) with prediction results")
+   
+args = parser.parse_args()
+
+base_path = "./data/Predictions"
+bl_path = join(base_path,args.model,"BL")
+dl_path = join(base_path,args.model,"DLBCL")
 
 un_bl = []
 un_dl = []

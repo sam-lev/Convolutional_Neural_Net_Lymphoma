@@ -90,14 +90,14 @@ $PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res
 
 $PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir SP-19-8085 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe --data_dir $datadir
 
-#$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir P --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe --data_dir $datadir
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir P --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe --data_dir $datadir
 
-#$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir Q --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe --data_dir $datadir
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir Q --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe --data_dir $datadir
 
-#$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir R --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe --data_dir $datadir
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir R --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe --data_dir $datadir
 
-#$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir SP --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm $augrandhe
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir SP --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm $augrandhe
 
-#$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir J1 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe --data_dir $datadir
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir J1 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe --data_dir $datadir
 
-#$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir J2 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe --data_dir $datadir
+$PY $script --tot test $GPU $N --mp 1 --nccl 1 --batch_size 500 --model_name res80 --load "$model" --unknown_dir J2 --depth $depth --class_weights 1,1 --crop_per_case $croppercase --multi_crop $multicrop --kernels $kernels --expansion $expansion --aug_norm 0 --aug_randhe $augrandhe --data_dir $datadir

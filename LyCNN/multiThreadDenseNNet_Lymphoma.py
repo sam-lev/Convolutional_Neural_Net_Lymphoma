@@ -610,8 +610,8 @@ class predictModel:
 
 if __name__ == '__main__':
    parser = argparse.ArgumentParser()
-   parser.add_argument('--model_name',type= str, default='MODEL',help="Name to prepend on model during training")
-   parser.add_argument('--gpu', default=None, help='comma separated list of GPU(s) to use.') 
+   parser.add_argument('--model_name', type=str, default='MODEL', help="Name to prepend on model during training")
+   parser.add_argument('--gpu', default=None, help='comma separated list of GPU(s) to use.')
    parser.add_argument('--load', help='load model')
    parser.add_argument('--kernels',type=int, default=24, help='initial kernel channel depth. Number kernels.')
    parser.add_argument('--kernel_size',type=int, default=3, help='initial kernel window size')
@@ -638,7 +638,7 @@ if __name__ == '__main__':
    parser.add_argument('--unknown_dir',type= str, default='../data/Unknowns/predictions/',help="unknown samples to classify")
    parser.add_argument('--save_sample',type= bool, default=False,help="boolean save originals")
    parser.add_argument('--original_dir',default=False,help="directory to save originals")
-   parser.add_argument('--data_dir', default=None, help="directory to read data from")
+   parser.add_argument('--data_dir', default='../data', help="directory to read data from")
    parser.add_argument('--num_gpu',type= int,help="Number GPU to use if not specificaly assigned")
    parser.add_argument('--scale_lr',type= float,default=1.0,help="Scale learning rate factor (for distributed training)")
    parser.add_argument('--gpu_frac',type= float,default=0.96,help="Number GPU to use if not specificaly assigned")
@@ -755,7 +755,7 @@ if __name__ == '__main__':
             elif (i+1)/args.multi_crop >= args.crop_per_case:
                max_crop_met += 1
             
-            path = '../data/Unknown/'+args.unknown_dir#predictions/'+args.out_dir+'_Predictions/'
+            path = os.path.join(args.data_dir,'Unknown',args.unknown_dir)#predictions/'+args.out_dir+'_Predictions/'
             if not os.path.exists( os.path.join(path, 'predictions')):
                os.makedirs( os.path.join(path, 'predictions') )
             path =  os.path.join(path, 'predictions')
@@ -789,11 +789,11 @@ if __name__ == '__main__':
                multi_crop_count = 0 if max_crop_met == 0 else -1
                crop_per_case -= 1
                
-               path = '../data/Predictions/'+args.unknown_dir
+               path = os.path.join(args.data_dir,'Predictions',args.unknown_dir)
                if not os.path.exists( path ):
                   os.makedirs( path )
                
-               path = path+'/graphX_predictions'+args.unknown_dir+'.txt'
+               path = path+'/res80'+args.unknown_dir+'.txt'
                if os.path.exists(path):
                   append_write = 'a'
                   #write results to file                   
