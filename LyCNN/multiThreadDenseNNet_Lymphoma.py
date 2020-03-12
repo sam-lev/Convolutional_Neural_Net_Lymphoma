@@ -498,7 +498,7 @@ def get_data(train_or_test, shuffle = None, image_size = None, scale_size = None
          print(">>>>>>>>>>>>>     multithread mp=",args.mp)
          ## Multithreaded
          ds = MultiThreadMapData(ds,
-                                 nr_thread= mp.cpu_count()//4,# if args.num_gpu > 1 else 2,
+                                 nr_thread= mp.cpu_count()//16,# if args.num_gpu > 1 else 2,
                                  map_func = aug_map_func,
                                  buffer_size=batch_size*4)# if args.num_gpu > 1 else batch_size*2)
          ds = PrefetchDataZMQ(ds, nr_proc = 1)
