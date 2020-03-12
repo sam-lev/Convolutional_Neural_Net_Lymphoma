@@ -638,7 +638,7 @@ if __name__ == '__main__':
    parser.add_argument('--unknown_dir',type= str, default='../data/Unknowns/predictions/',help="unknown samples to classify")
    parser.add_argument('--save_sample',type= bool, default=False,help="boolean save originals")
    parser.add_argument('--original_dir',default=False,help="directory to save originals")
-   parser.add_argument('--data_dir', default='../data', help="directory to read data from")
+   parser.add_argument('--data_dir', default=None, help="directory to read data from")
    parser.add_argument('--num_gpu',type= int,help="Number GPU to use if not specificaly assigned")
    parser.add_argument('--scale_lr',type= float,default=1.0,help="Scale learning rate factor (for distributed training)")
    parser.add_argument('--gpu_frac',type= float,default=0.96,help="Number GPU to use if not specificaly assigned")
