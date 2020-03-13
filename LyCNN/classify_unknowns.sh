@@ -12,7 +12,7 @@ model="$1"
 
 #    %%  ___example_run___  %%
 #
-#    sbatch (model) (multi_crop) (crop_per_case) (kernels) (expansion) (depth) (aug_norm) (script) (server) 
+#    sbatch (model) (environment) (multi_crop) (crop_per_case) (kernels) (expansion) (depth) (aug_norm) (script) (server) 
 #
 #    sbatch ./train_log/model 4 20 16 12 40 0 multiThreadNet.py 1 1
 # note: multi_crop==0 for single crop (non-multiple).
