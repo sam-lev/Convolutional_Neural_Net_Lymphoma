@@ -8,7 +8,10 @@
 
 source ~/.bashrc
 
-model='/home/sci/samlev/Convolutional_Neural_Net_Lymphoma/train_log/$1/min-validation_error'
+train_log="/home/sci/samlev/Convolutional_Neural_Net_Lymphoma/train_log"
+model_set=$train_log/$1
+opt_model="min-validation_error"
+model=$model_set/$opt_model
 
 #    %%  ___example_run___  %%
 #
