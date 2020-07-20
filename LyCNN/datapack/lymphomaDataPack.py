@@ -382,7 +382,10 @@ def get_filenames(dir, train_or_test = '', unknown_dir = None, idx = False):
         print(">>>>>>>>>> Using ", str(file_count), " batched files.")
 
     if train_or_test == 'train':
-        print(">>>>>>>>>>>>>>>>  ", os.path.join(dir, 'train','train_idx'))
+        print(">>>>>>>>>>>>>>>>  ", os.path.join(dir, 'train'))
+        print("using idx? ", idx)
+        print("cwd: ", os.getcwd())
+        
         path, dirs, files_train = next(os.walk(os.path.join(dir, 'train'))) if not idx else next(os.walk(os.path.join(dir, 'train','train_idx')))
         file_count = len(files_train)
         filenames = [os.path.join(dir, 'train', batch) for batch in files_train] if not idx else [os.path.join(dir, 'train', 'train_idx',batch) for batch in files_train]
@@ -434,7 +437,7 @@ class lymphomaBase( RNGDataFlow ):
             shuffle = False
         
         if dir is None:
-            dir = '../data' #and changes in behavor for more classes here
+            dir = './data' #and changes in behavor for more classes here
         fnames = get_filenames(dir, train_or_test, unknown_dir=unknown_dir, idx=idx)
         
         self.fs = fnames
